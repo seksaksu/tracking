@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="th" class="scroll-smooth">
+<html lang="th" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Koh Larn Travel Planner & Smart Budget</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GPS Tracking HUD & Route Exporter</title>
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -12,979 +12,812 @@
             theme: {
                 extend: {
                     colors: {
+                        slate: {
+                            950: '#030712'
+                        },
                         brand: {
-                            navy: '#0f172a',    /* Slate 900 */
-                            dark: '#1e293b',    /* Slate 800 */
-                            ocean: '#0ea5e9',   /* Sky 500 */
-                            cyan: '#06b6d4',    /* Cyan 500 */
-                            sand: '#f59e0b',    /* Amber 500 */
-                            light: '#f8fafc',   /* Slate 50 */
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            900: '#1e3a8a',
                         }
+                    },
+                    boxShadow: {
+                        'premium': '0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
+                        'glow': '0 0 20px rgba(59, 130, 246, 0.35)',
+                        'indigo-glow': '0 0 20px rgba(79, 70, 229, 0.3)',
                     }
                 }
             }
         }
     </script>
 
-    <!-- Google Fonts: IBM Plex Sans Thai (Th) & Plus Jakarta Sans (En/Numbers) -->
+    <!-- Leaflet Map CSS CDN -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Google Fonts (Sarabun & Space Grotesk) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    
-    <!-- FontAwesome for Premium Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=500;700&family=Sarabun:wght=300;400;500;600;700&display=swap" rel="stylesheet">
+
     <style>
         body {
-            font-family: 'Plus Jakarta Sans', 'IBM Plex Sans Thai', sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Sarabun', sans-serif;
         }
-        /* Custom smooth scrollbar for premium look */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+        .font-numbers {
+            font-family: 'Space Grotesk', sans-serif;
         }
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: rgba(241, 245, 249, 1);
-            border-radius: 10px;
+        /* ซ่อนปุ่มซูมมาตรฐานของ Leaflet เพื่อใช้ UI ดีไซน์ใหม่ของเรา */
+        .leaflet-control-zoom {
+            display: none !important;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(148, 163, 184, 0.5);
-            border-radius: 10px;
+        /* แอนิเมชันจุดพัลส์พิกัดแบบเรืองแสง 3 มิติ (Glowing Aura Coordinate Marker) */
+        .gps-pulse-marker {
+            position: relative;
         }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(100, 116, 139, 0.8);
+        .gps-pulse-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 14px;
+            height: 14px;
+            background: #2563eb;
+            border: 2.5px solid #ffffff;
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(37, 99, 235, 0.8);
+        }
+        .gps-pulse-marker::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            background: rgba(37, 99, 235, 0.3);
+            border-radius: 50%;
+            animation: pulse-ring 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
+        }
+        @keyframes pulse-ring {
+            0% { transform: translate(-50%, -50%) scale(0.35); opacity: 0.9; }
+            80%, 100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+        }
+        /* ซ่อนแถบเลื่อนบนเบราว์เซอร์ */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(156, 163, 175, 0.3);
+            border-radius: 2px;
         }
     </style>
 </head>
-<body class="text-slate-800 flex flex-col min-h-screen antialiased selection:bg-sky-500/20">
+<body class="h-full w-full overflow-hidden bg-slate-950 relative">
 
-    <!-- Glassmorphic Header Navigation -->
-    <nav class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80 transition-all duration-300">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center justify-between h-16 md:h-20">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-600 to-cyan-500 flex items-center justify-center text-white shadow-md shadow-sky-500/20">
-                        <i class="fa-solid fa-umbrella-beach text-lg"></i>
-                    </div>
-                    <div>
-                        <span class="font-extrabold text-lg md:text-xl tracking-tight bg-gradient-to-r from-slate-900 via-sky-600 to-cyan-500 bg-clip-text text-transparent">KOH LARN</span>
-                        <span class="text-[10px] font-semibold text-slate-400 block tracking-wider uppercase">Travel Platform</span>
-                    </div>
-                </div>
-                <div class="hidden md:flex items-center space-x-8">
-                    <a href="#map-section" class="text-sm font-medium text-slate-500 hover:text-sky-600 transition duration-200">แผนที่เส้นทาง</a>
-                    <a href="#budget-section" class="text-sm font-medium text-slate-500 hover:text-sky-600 transition duration-200">ระบบงบประมาณ</a>
-                    <a href="#ferry-section" class="text-sm font-medium text-slate-500 hover:text-sky-600 transition duration-200">เช็กรอบเรือข้ามฟาก</a>
-                </div>
-                <div>
-                    <span class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wider transition-all duration-200 cursor-pointer shadow-sm flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span> Pattaya - Chonburi
-                    </span>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <!-- พื้นที่แสดงแผนที่แบบเต็มหน้าจอ (Base Layer) -->
+    <div id="map" class="absolute inset-0 w-full h-full z-0"></div>
 
-    <!-- Hero Section -->
-    <header class="relative bg-white pt-12 pb-16 md:py-24 px-4 overflow-hidden border-b border-slate-100">
-        <!-- Abstract Glow Background Vectors -->
-        <div class="absolute top-[-20%] left-[-10%] w-[50%] h-[60%] rounded-full bg-sky-200/30 blur-[120px] pointer-events-none"></div>
-        <div class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[50%] rounded-full bg-cyan-100/40 blur-[100px] pointer-events-none"></div>
-
-        <div class="relative max-w-5xl mx-auto text-center z-10">
-            <span class="inline-flex items-center gap-1.5 bg-sky-50 text-sky-700 border border-sky-100 px-4 py-1.5 rounded-full text-xs font-semibold tracking-wide">
-                <i class="fa-solid fa-sparkles text-sky-500"></i> Next-Gen Travel Planner & Budget Manager
-            </span>
-            <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-slate-900 mt-6 mb-5 leading-[1.15]">
-                วางแผนทริปเกาะล้าน <br class="hidden sm:inline">
-                <span class="bg-gradient-to-r from-sky-600 to-cyan-500 bg-clip-text text-transparent">คุมงบประมาณง่ายๆ</span> ได้ในหน้าเดียว
-            </h1>
-            <p class="text-base md:text-lg text-slate-500 font-light max-w-2xl mx-auto mb-10 leading-relaxed">
-                สำรวจแผนที่เส้นทาง จุดเชื่อมต่อพิกัด GPS คำนวณระยะทางจากตำแหน่งจริงแบบเรียลไทม์ พร้อมตารางเรือข้ามฟาก และโปรแกรมวิเคราะห์งบประมาณการท่องเที่ยวครบวงจร
-            </p>
-            <div class="flex flex-wrap justify-center gap-4">
-                <a href="#map-section" class="bg-slate-900 hover:bg-slate-800 text-white font-semibold px-7 py-4 rounded-xl shadow-lg shadow-slate-900/10 hover:shadow-slate-900/20 hover:-translate-y-0.5 transition-all text-sm">
-                    <i class="fa-solid fa-map-location-dot mr-2 text-sky-400"></i> แผนที่ & นำทาง GPS
-                </a>
-                <a href="#budget-section" class="bg-white hover:bg-slate-50 text-slate-800 font-semibold px-7 py-4 rounded-xl border border-slate-200 hover:border-slate-300 shadow-sm transition-all text-sm">
-                    <i class="fa-solid fa-calculator mr-2 text-indigo-500"></i> บันทึกรายรับ-รายจ่ายทริป
-                </a>
-            </div>
-        </div>
-    </header>
-
-    <!-- Main Workspace -->
-    <main class="flex-grow max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-12">
+    <!-- ส่วนที่ 1: แผงควบคุมลอยตัวระดับพรีเมียม (Floating Glassmorphism Dashboard) -->
+    <div id="dashboard-card" class="absolute top-4 left-4 right-4 md:right-auto md:w-96 max-h-[calc(100vh-2rem)] z-[1000] flex flex-col transition-all duration-500 transform ease-in-out">
         
-        <!-- Interactive Map and GPS Tracker Segment -->
-        <div id="map-section" class="scroll-mt-24 mb-16">
-            <div class="bg-white rounded-2xl border border-slate-200/60 shadow-xl shadow-slate-100/50 overflow-hidden">
-                <!-- Map Header Bar -->
-                <div class="p-6 md:p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center md:justify-between gap-6 bg-slate-50/50">
-                    <div>
-                        <div class="flex items-center gap-2 mb-1">
-                            <span class="p-1.5 bg-sky-50 text-sky-600 rounded-lg text-sm"><i class="fa-solid fa-map-marked-alt"></i></span>
-                            <h2 class="text-xl font-bold text-slate-900">แผนที่เส้นทางแบบละเอียด (พัทยา - เกาะล้าน)</h2>
-                        </div>
-                        <p class="text-slate-400 text-xs pl-8">แผนที่แสดงจุดขึ้นเรือแหลมบาลีฮาย, จุดฝากจอดรถ และพิกัดเดินทางข้ามเกาะ</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-3 pl-8 md:pl-0">
-                        <button onclick="fullscreenMap()" class="bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition duration-150 active:scale-95 shadow-sm">
-                            <i class="fa-solid fa-maximize text-slate-400"></i> ขยายขนาดแผนที่
-                        </button>
-                        <a href="https://www.google.com/maps/d/u/0/embed?mid=1McZ4-jqNfgJQL7b8qaAKVFp-VlH2gN8" target="_blank" class="bg-sky-600 hover:bg-sky-500 text-white px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition shadow-md shadow-sky-500/10">
-                            <i class="fa-solid fa-location-arrow"></i> เปิดใน Google Maps
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Embed Area Grid -->
-                <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
-                    
-                    <!-- Left Frame: Embedded Google My Maps -->
-                    <div id="mapContainer" class="lg:col-span-8 relative h-[450px] md:h-[550px] bg-slate-100 transition-all duration-300">
-                        <iframe 
-                            src="https://www.google.com/maps/d/u/0/embed?mid=1McZ4-jqNfgJQL7b8qaAKVFp-VlH2gN8&ehbc=2E312F" 
-                            class="absolute inset-0 w-full h-full border-0" 
-                            allowfullscreen="" 
-                            loading="lazy" 
-                            referrerpolicy="no-referrer-when-downgrade">
-                        </iframe>
-                    </div>
-
-                    <!-- Right Column: Location-Based GPS Tracker Panel -->
-                    <div class="lg:col-span-4 p-6 md:p-8 bg-slate-50/30 flex flex-col justify-between">
-                        <div>
-                            <!-- Modern GPS Distance Indicator -->
-                            <div class="mb-8 p-5 bg-white border border-slate-200/60 rounded-2xl shadow-sm">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse"></span>
-                                    <h3 class="text-xs font-bold text-slate-900 tracking-wider uppercase">Live GPS Distance Tracker</h3>
-                                </div>
-                                <p class="text-xs text-slate-500 leading-relaxed mb-4">
-                                    ระบุพิกัดตำแหน่งจริงของคุณ เพื่อคำนวณระยะทางเชิงภูมิศาสตร์และประเมินเวลาเดินทางตรงสู่ "ท่าเรือแหลมบาลีฮาย"
-                                </p>
-                                
-                                <div id="location-status-container" class="space-y-4">
-                                    <button onclick="getUserLocation()" id="btn-get-location" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2.5 transition active:scale-[0.98] shadow-sm">
-                                        <i class="fa-solid fa-location-crosshairs text-sky-400"></i> เช็กตำแหน่งและระยะห่างของฉัน
-                                    </button>
-                                    
-                                    <!-- Dynamic Details Card (Injected after GPS success) -->
-                                    <div id="location-details" class="hidden space-y-3 bg-slate-50/60 p-4 rounded-xl border border-slate-100 text-xs">
-                                        <div class="flex justify-between items-center py-1">
-                                            <span class="text-slate-400 font-medium">พิกัดปัจจุบัน:</span>
-                                            <span id="txt-coords" class="font-mono text-slate-700 font-bold">--</span>
-                                        </div>
-                                        <div class="flex justify-between items-center py-1 border-t border-slate-200/40">
-                                            <span class="text-slate-400 font-medium">ระยะห่างถึงบาลีฮาย:</span>
-                                            <span id="txt-distance" class="font-extrabold text-sky-600 text-sm">-- กม.</span>
-                                        </div>
-                                        <div class="flex justify-between items-center py-1 border-t border-slate-200/40">
-                                            <span class="text-slate-400 font-medium">เวลาเดินทางโดยประมาณ:</span>
-                                            <span id="txt-duration" class="font-semibold text-slate-700">--</span>
-                                        </div>
-                                        <a href="#" id="btn-navigate" target="_blank" class="w-full bg-sky-100 hover:bg-sky-200 text-sky-700 font-bold py-2.5 px-4 rounded-lg text-center block transition-all text-xs mt-2">
-                                            <i class="fa-solid fa-location-arrow mr-1.5"></i> นำทางผ่าน Google Maps
-                                        </a>
-                                    </div>
-
-                                    <!-- Errors -->
-                                    <div id="location-error" class="hidden text-xs text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100/50 flex items-start gap-2.5">
-                                        <i class="fa-solid fa-triangle-exclamation mt-0.5 text-rose-500"></i>
-                                        <span id="txt-error">ไม่สามารถระบุพิกัดได้ โปรดตรวจสอบการอนุญาตใช้งาน GPS</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Milestones Timeline -->
-                            <h3 class="text-sm font-bold text-slate-900 mb-5 tracking-wide uppercase">จุดเชื่อมต่อการเดินทางหลัก</h3>
-                            <div class="space-y-6 relative border-l-2 border-slate-200/80 ml-2.5">
-                                <div class="relative pl-6">
-                                    <div class="absolute -left-[6px] top-1.5 bg-slate-900 rounded-full w-2.5 h-2.5"></div>
-                                    <h4 class="font-semibold text-slate-800 text-xs">มุ่งหน้าสู่ชลบุรี-พัทยา</h4>
-                                    <p class="text-[11px] text-slate-400 mt-1">ใช้เส้นทางหลวงหมายเลข 7 หรือบางนา-ตราด ดิ่งลงใต้สู่พัทยา</p>
-                                </div>
-                                <div class="relative pl-6">
-                                    <div class="absolute -left-[6px] top-1.5 bg-sky-500 rounded-full w-2.5 h-2.5"></div>
-                                    <h4 class="font-semibold text-slate-800 text-xs">จุดรับตั๋วและจอดรถ ท่าเทียบเรือบาลีฮาย</h4>
-                                    <p class="text-[11px] text-slate-400 mt-1">เข้าจุดจอดรถที่ฝากอาคารจอดรถของรัฐหรือลานเอกชนข้างเคียง</p>
-                                </div>
-                                <div class="relative pl-6">
-                                    <div class="absolute -left-[6px] top-1.5 bg-cyan-400 rounded-full w-2.5 h-2.5"></div>
-                                    <h4 class="font-semibold text-slate-800 text-xs">เกาะล้าน (ท่าหน้าบ้าน/หาดตาแหวน)</h4>
-                                    <p class="text-[11px] text-slate-400 mt-1">ขึ้นเรือโดยสารแบบเมล์ (40 นาที) หรือสปีดโบ๊ทพรีเมียม (15 นาที)</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Notice Info Card -->
-                        <div class="mt-8 pt-5 border-t border-slate-200/60">
-                            <div class="bg-indigo-50/60 border border-indigo-100 rounded-xl p-4 flex items-start gap-3">
-                                <span class="text-indigo-600 text-sm mt-0.5"><i class="fa-solid fa-circle-info"></i></span>
-                                <div>
-                                    <h5 class="text-xs font-bold text-indigo-900">เกร็ดความรู้การนำทาง</h5>
-                                    <p class="text-[11px] text-indigo-800/80 mt-1 leading-relaxed">บนเกาะล้านมีเส้นทางขึ้นจุดชมวิวเป็นเนินเขาสูงชัน ควรขับขี่มอเตอร์ไซค์ด้วยความระมัดระวังสูงสุด</p>
-                                </div>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Trip Budget Planner Section -->
-        <div id="budget-section" class="scroll-mt-24 mb-16">
-            <div class="text-center max-w-2xl mx-auto mb-10">
-                <span class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-100 px-3.5 py-1 rounded-full text-xs font-semibold tracking-wider uppercase">
-                    Trip Accounting Engine
-                </span>
-                <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900 mt-4">บันทึกรายรับ-รายจ่ายของทริป</h2>
-                <p class="text-slate-400 text-xs mt-2.5">ออกแบบมาเพื่อช่วยให้นักท่องเที่ยวควบคุมรายจ่าย จัดสรรกระเป๋าเงินได้อย่างมีประสิทธิภาพและประณีต</p>
-            </div>
-
-            <!-- Financial Summary Dashboard Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                
-                <!-- Card 1: Total Trip Budget Setting -->
-                <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden flex flex-col justify-between h-44">
-                    <div class="absolute right-4 bottom-2 opacity-[0.03] text-9xl pointer-events-none"><i class="fa-solid fa-wallet"></i></div>
-                    <div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">งบประมาณทริปเป้าหมาย</span>
-                        <div class="text-3xl font-black mt-2 tracking-tight">฿ <span id="display-budget">0</span></div>
-                    </div>
-                    <div class="flex items-center gap-2 mt-4">
-                        <input type="number" id="input-budget-setting" placeholder="ระบุจำนวนงบ" class="bg-white/10 hover:bg-white/15 focus:bg-white text-white focus:text-slate-900 placeholder-white/50 rounded-xl px-3 py-2 text-xs font-semibold outline-none border border-white/10 w-full max-w-[130px] transition duration-200">
-                        <button onclick="setTripBudget()" class="bg-sky-500 hover:bg-sky-400 text-white font-bold px-4 py-2 rounded-xl text-xs shadow-md shadow-sky-500/10 transition-all duration-150 active:scale-95 whitespace-nowrap">บันทึกงบ</button>
-                    </div>
-                </div>
-
-                <!-- Card 2: Accumulated Expenses -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/60 relative overflow-hidden flex flex-col justify-between h-44">
-                    <div class="absolute right-4 bottom-2 opacity-[0.04] text-9xl text-rose-500 pointer-events-none"><i class="fa-solid fa-receipt"></i></div>
-                    <div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">ยอดค่าใช้จ่ายที่เกิดขึ้นจริง</span>
-                        <div class="text-3xl font-black text-slate-900 mt-2 tracking-tight">฿ <span id="display-total-expense">0</span></div>
-                    </div>
-                    <!-- Small breakdown badges -->
-                    <div class="text-[10px] text-slate-500 flex flex-wrap gap-1.5 mt-4">
-                        <span class="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">🚕 เดินทาง: <b>฿<span id="badge-cat-travel">0</span></b></span>
-                        <span class="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">🏨 ที่พัก: <b>฿<span id="badge-cat-hotel">0</span></b></span>
-                        <span class="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg">🍲 กินเที่ยว: <b>฿<span id="badge-cat-food">0</span></b></span>
-                    </div>
-                </div>
-
-                <!-- Card 3: Remaining Reserves -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/60 relative overflow-hidden flex flex-col justify-between h-44">
-                    <div class="absolute right-4 bottom-2 opacity-[0.04] text-9xl text-emerald-500 pointer-events-none"><i class="fa-solid fa-sack-dollar"></i></div>
-                    <div>
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">งบประมาณส่วนเกินคงเหลือ</span>
-                        <div class="text-3xl font-black mt-2 tracking-tight" id="div-remaining-container">฿ <span id="display-remaining-budget">0</span></div>
-                    </div>
-                    <!-- Smooth linear visual gauge -->
-                    <div class="mt-4">
-                        <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1.5">
-                            <span>อัตราส่วนการใช้เงิน:</span>
-                            <span id="txt-budget-percent" class="font-bold">0%</span>
-                        </div>
-                        <div class="w-full bg-slate-100 rounded-full h-1.5">
-                            <div id="bar-budget-percent" class="bg-sky-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Input Form & Output Log Area -->
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <!-- Add Expense Entry Form (Col Span 4) -->
-                <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200/60 lg:col-span-4">
-                    <h3 class="text-sm font-bold text-slate-900 mb-6 tracking-wide uppercase flex items-center gap-2">
-                        <span class="p-1 bg-sky-50 text-sky-600 rounded-lg"><i class="fa-solid fa-plus-circle"></i></span> เพิ่มรายการบัญชีรายจ่าย
-                    </h3>
-                    
-                    <div class="space-y-5">
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">รายละเอียดค่าใช้จ่าย</label>
-                            <input type="text" id="expense-title" placeholder="เช่น ค่าที่พัก ค่าน้ำมัน ค่าเรือ" class="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 rounded-xl px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200">
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">หมวดหมู่</label>
-                            <select id="expense-category" class="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 rounded-xl px-4 py-3 text-sm text-slate-800 outline-none transition-all duration-200 cursor-pointer">
-                                <option value="travel">🚕 การเดินทาง (รถยนต์/เรือ/รถตู้)</option>
-                                <option value="hotel">🏨 ที่พักและรีสอร์ท</option>
-                                <option value="food">🍲 อาหารและเครื่องดื่ม</option>
-                                <option value="activity">🤿 กิจกรรมชายหาด/ดำน้ำ</option>
-                                <option value="shopping">🎁 ช้อปปิ้ง/ของฝาก</option>
-                                <option value="other">📝 อื่นๆ</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">จำนวนเงิน (บาท)</label>
-                            <div class="relative">
-                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-bold">฿</span>
-                                <input type="number" id="expense-amount" placeholder="0.00" class="w-full bg-slate-50 focus:bg-white border border-slate-200 focus:border-slate-900 rounded-xl pl-8 pr-4 py-3 text-sm text-slate-800 font-bold outline-none transition-all duration-200">
-                            </div>
-                        </div>
-
-                        <button onclick="addExpense()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition duration-150 active:scale-95 shadow-sm">
-                            <i class="fa-solid fa-save"></i> บันทึกรายการใช้จ่าย
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Ledger History Table (Col Span 8) -->
-                <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-slate-200/60 lg:col-span-8 flex flex-col justify-between">
-                    <div>
-                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-4 border-b border-slate-100">
-                            <h3 class="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-2">
-                                <span class="p-1 bg-sky-50 text-sky-600 rounded-lg"><i class="fa-solid fa-list-ul"></i></span> ประวัติการชำระเงิน
-                            </h3>
-                            <!-- Segmented Controller Filter Buttons -->
-                            <div class="flex bg-slate-50 p-1 rounded-xl border border-slate-200/60 flex-wrap">
-                                <button onclick="filterExpenses('all')" id="filter-all" class="px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-150 bg-slate-900 text-white">ทั้งหมด</button>
-                                <button onclick="filterExpenses('travel')" id="filter-travel" class="px-3 py-1.5 text-[10px] font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all duration-150">การเดินทาง</button>
-                                <button onclick="filterExpenses('hotel')" id="filter-hotel" class="px-3 py-1.5 text-[10px] font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all duration-150">ที่พัก</button>
-                                <button onclick="filterExpenses('food')" id="filter-food" class="px-3 py-1.5 text-[10px] font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all duration-150">อาหาร</button>
-                            </div>
-                        </div>
-
-                        <!-- Table Area -->
-                        <div class="overflow-x-auto custom-scrollbar max-h-[300px] overflow-y-auto pr-1">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="text-slate-400 text-[10px] font-extrabold border-b border-slate-100 tracking-wider uppercase">
-                                        <th class="pb-3 pl-3">รายการบัญชี</th>
-                                        <th class="pb-3">ประเภทหมวดหมู่</th>
-                                        <th class="pb-3 text-right">จำนวนเงิน</th>
-                                        <th class="pb-3 text-center">ตัวเลือก</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="expense-table-body" class="text-xs divide-y divide-slate-100">
-                                    <!-- Dynamic Rows Injected -->
-                                    <tr id="empty-state-row">
-                                        <td colspan="4" class="py-16 text-center text-slate-400">
-                                            <div class="text-3xl mb-3 opacity-60">🏝️</div>
-                                            <p class="text-xs font-semibold text-slate-500">ยินดีต้อนรับสู่ทริปเกาะล้าน เริ่มลงบันทึกใช้จ่ายแรกได้ที่แถบซ้ายมือ</p>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Reset Ledger Actions -->
-                    <div class="mt-6 pt-5 border-t border-slate-100 flex flex-col sm:flex-row gap-4 items-center justify-between text-xs text-slate-400">
-                        <span class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-slate-300"></i> จัดเก็บข้อมูลอย่างปลอดภัยบนคอมพิวเตอร์ของคุณ</span>
-                        <button onclick="clearAllExpenses()" class="text-rose-500 hover:text-rose-600 font-bold hover:underline flex items-center gap-1.5 transition">
-                            <i class="fa-solid fa-rotate-left"></i> ล้างข้อมูลรายรับรายจ่ายทั้งหมด
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Ferry Schedule Segment -->
-        <div id="ferry-section" class="scroll-mt-24 mb-16">
-            <div class="bg-white rounded-2xl border border-slate-200/60 p-6 md:p-10 shadow-lg relative overflow-hidden">
-                <div class="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full blur-3xl pointer-events-none"></div>
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center relative z-10">
-                    
-                    <!-- Clock & Suggestions Col -->
-                    <div class="lg:col-span-5">
-                        <span class="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 rounded-full text-xs font-semibold tracking-wider uppercase">
-                            Maritime Terminal Status
-                        </span>
-                        <h2 class="text-2xl font-black text-slate-900 mt-4 mb-3">สถานะตารางเดินเรือวันนี้</h2>
-                        <p class="text-slate-400 text-xs leading-relaxed mb-6">
-                            ตารางเดินเรือเมล์ขนาดใหญ่ ข้อมูลอ้างอิงตรงจากพัทยา-แหลมบาลีฮายแบบเรียลไทม์ พร้อมประมวลผลรอบเรือที่ดีที่สุด ณ ขณะนี้
-                        </p>
-                        
-                        <!-- Premium Terminal Digital Clock -->
-                        <div class="bg-slate-900 text-white rounded-2xl p-6 border border-slate-800 shadow-xl relative overflow-hidden">
-                            <div class="absolute right-[-20px] top-[-20px] text-slate-800 text-9xl font-black opacity-10 select-none"><i class="fa-solid fa-clock"></i></div>
-                            <div class="text-[10px] font-bold text-slate-400 tracking-widest uppercase">เวลาท้องถิ่น ณ ปัจจุบัน</div>
-                            <div id="liveClock" class="text-3xl font-extrabold text-cyan-400 my-2 font-mono tracking-wider">00:00:00</div>
-                            <div class="text-xs pt-4 border-t border-slate-800">
-                                <span class="text-slate-400 block mb-1">รอบเรือข้ามฟากมาตรฐานที่แนะนำถัดไป:</span>
-                                <span id="nextFerrySuggest" class="font-extrabold text-emerald-400 text-lg">07:00 น.</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Timetable Lists Col -->
-                    <div class="lg:col-span-7 bg-slate-50 rounded-2xl p-6 border border-slate-200/60">
-                        <h3 class="text-xs font-bold text-slate-800 uppercase tracking-widest mb-4 pb-3 border-b border-slate-200/60 flex items-center gap-2">
-                            <i class="fa-solid fa-ship text-sky-500"></i> ตารางเที่ยวเดินเรือโดยสารมาตรฐาน (พัทยา ↔ เกาะล้าน)
-                        </h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <div>
-                                <h4 class="text-[11px] font-bold text-slate-400 mb-2 tracking-wide uppercase">เที่ยวไป (แหลมบาลีฮาย → ท่าหน้าบ้าน)</h4>
-                                <ul class="text-xs text-slate-700 space-y-2 bg-white p-4 rounded-xl border border-slate-200/40 shadow-sm">
-                                    <li class="flex justify-between items-center"><span>รอบแรก:</span> <span class="font-bold text-slate-900">07:00</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสอง:</span> <span class="font-semibold text-slate-600">09:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสาม:</span> <span class="font-semibold text-slate-600">11:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสี่:</span> <span class="font-semibold text-slate-600">13:00</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบห้า:</span> <span class="font-semibold text-slate-600">14:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสุดท้าย:</span> <span class="font-bold text-rose-500">18:30</span></li>
-                                </ul>
-                            </div>
-                            <div>
-                                <h4 class="text-[11px] font-bold text-slate-400 mb-2 tracking-wide uppercase">เที่ยวกลับ (ท่าหน้าบ้าน → แหลมบาลีฮาย)</h4>
-                                <ul class="text-xs text-slate-700 space-y-2 bg-white p-4 rounded-xl border border-slate-200/40 shadow-sm">
-                                    <li class="flex justify-between items-center"><span>รอบแรก:</span> <span class="font-bold text-slate-900">06:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสอง:</span> <span class="font-semibold text-slate-600">07:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสาม:</span> <span class="font-semibold text-slate-600">09:30</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสี่:</span> <span class="font-semibold text-slate-600">12:00</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบห้า:</span> <span class="font-semibold text-slate-600">14:00</span></li>
-                                    <li class="flex justify-between items-center"><span>รอบสุดท้าย:</span> <span class="font-bold text-rose-500">18:00</span></li>
-                                </ul>
-                            </div>
-                        </div>
-                        <p class="text-[10px] text-slate-400 mt-4 text-center leading-relaxed">
-                            * ตารางเวลาข้างต้นอาจมีการปรับเปลี่ยนตามสถานการณ์ความจุคลื่นลม สภาพภูมิอากาศ และจำนวนผู้โดยสาร
-                        </p>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        <!-- Luggage Checklist Widget -->
-        <div class="bg-white rounded-2xl border border-slate-200/60 p-6 md:p-8">
-            <div class="flex flex-col md:flex-row gap-8 items-start">
-                <div class="md:w-1/3">
-                    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                        <span class="p-1.5 bg-slate-50 text-slate-800 rounded-lg"><i class="fa-solid fa-clipboard-check"></i></span> เช็คลิสต์ก่อนออกทริป
-                    </h3>
-                    <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
-                        ทบทวนและตรวจสอบสิ่งของเครื่องใช้จำเป็นของคุณก่อนออกเดินทาง เพื่อให้การไปทะเลเป็นไปอย่างราบรื่นไม่มีสะดุด
-                    </p>
-                    <div class="mt-4 bg-sky-50/60 border border-sky-100 rounded-xl p-4 text-xs text-sky-800">
-                        <span class="font-bold block mb-1">💡 Travel Hack:</span> อย่าลืมเตรียมกระเป๋ากันน้ำขนาดเล็กสำหรับโทรศัพท์และบัตรสำคัญต่างๆ เมื่อต้องทำกิจกรรมบนหาด
-                    </div>
-                </div>
-                <div class="md:w-2/3 w-full">
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="checklist-container">
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">ชุดเที่ยวทะเล & ชุดว่ายน้ำ 👙</span>
-                        </label>
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">ครีมกันแดด Waterproof 🧴</span>
-                        </label>
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">หมวก/แว่นตากันแดด 🕶️</span>
-                        </label>
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">ซองกันน้ำ / กล้องกันน้ำ 📷</span>
-                        </label>
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">ยาแก้เมาคลื่น / พลาสเตอร์ยา 💊</span>
-                        </label>
-                        <label class="flex items-center gap-3 p-4 bg-slate-50 hover:bg-slate-100 rounded-xl cursor-pointer transition border border-slate-200/40">
-                            <input type="checkbox" class="w-4 h-4 rounded text-sky-600 focus:ring-sky-500 border-slate-300">
-                            <span class="text-xs text-slate-700 font-semibold">สายชาร์จ / แบตเตอรี่สำรอง 🔋</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Footer Area -->
-    <footer class="bg-slate-900 text-slate-400 py-16 px-4 border-t border-slate-800">
-        <div class="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
-            <div>
-                <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">เกาะล้าน (Koh Larn Chonburi)</h3>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                    เกาะที่โดดเด่นด้วยทรายละเอียดและน้ำทะเลใสสะอาดราวมัลดีฟส์เมืองไทย เป็นจุดหมายปลายทางยอดนิยมในการพักผ่อนที่เดินทางง่ายและประหยัดงบ
-                </p>
-            </div>
-            <div>
-                <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">แหล่งข้อมูลการนำทาง</h3>
-                <ul class="text-xs text-slate-400 space-y-3">
-                    <li><a href="https://www.google.com/maps/d/u/0/embed?mid=1McZ4-jqNfgJQL7b8qaAKVFp-VlH2gN8" target="_blank" class="hover:text-sky-400 transition-colors duration-150 flex items-center gap-2"><i class="fa-solid fa-map-pin text-sky-500"></i> ลิงก์แผนที่ Google Maps ต้นฉบับ</a></li>
-                    <li><a href="#ferry-section" class="hover:text-sky-400 transition-colors duration-150 flex items-center gap-2"><i class="fa-solid fa-anchor text-slate-400"></i> เวลาเดินเรือในระบบ</a></li>
-                    <li><a href="https://www.pattaya.go.th" target="_blank" class="hover:text-sky-400 transition-colors duration-150 flex items-center gap-2"><i class="fa-solid fa-building-columns text-slate-400"></i> เว็บไซต์อย่างเป็นทางการเมืองพัทยา</a></li>
-                </ul>
-            </div>
-            <div>
-                <h3 class="text-sm font-bold text-white uppercase tracking-widest mb-4">สถานที่ตั้งท่าเทียบเรือ</h3>
-                <p class="text-xs text-slate-400 leading-relaxed mb-3">
-                    ท่าเทียบเรือแหลมบาลีฮาย พัทยาใต้ เมืองพัทยา อำเภอบางละมุง จังหวัดชลบุรี 20150
-                </p>
-                <div class="flex gap-3 text-lg text-slate-400">
-                    <a href="#" class="hover:text-white transition"><i class="fa-brands fa-facebook"></i></a>
-                    <a href="#" class="hover:text-white transition"><i class="fa-brands fa-instagram"></i></a>
-                    <a href="#" class="hover:text-white transition"><i class="fa-brands fa-youtube"></i></a>
-                </div>
-            </div>
-        </div>
-        <div class="max-w-7xl mx-auto pt-8 border-t border-slate-800 text-center text-[10px] text-slate-500">
-            <p>© 2026 Koh Larn Trip Planner. Designed & Developed by Gemini in Web Free Tier. All rights reserved.</p>
-        </div>
-    </footer>
-
-    <!-- Interactivity Script -->
-    <script>
-        // Budget & Expenses Application States
-        let tripBudget = 5000; // Default budget setting
-        let expenses = []; // List of expenses
-        let currentFilter = 'all';
-
-        // Load data from LocalStorage if exists
-        function loadSavedBudgetData() {
-            const savedBudget = localStorage.getItem('tripBudget');
-            const savedExpenses = localStorage.getItem('tripExpenses');
+        <!-- ตัวแผงหลัก (Main Glass Panel) -->
+        <div class="bg-white/90 backdrop-blur-xl border border-white/40 shadow-premium rounded-3xl overflow-hidden flex flex-col max-h-[85vh] md:max-h-[88vh]">
             
-            if (savedBudget) {
-                tripBudget = parseFloat(savedBudget);
-                document.getElementById('input-budget-setting').value = tripBudget;
-            } else {
-                document.getElementById('input-budget-setting').value = tripBudget;
-            }
+            <!-- ส่วนหัว (Header Card) -->
+            <div class="p-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between border-b border-white/10 relative overflow-hidden">
+                <div class="absolute -right-6 -top-6 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl"></div>
+                <div class="flex items-center space-x-3.5 relative z-10">
+                    <div class="p-2.5 bg-brand-600/20 text-brand-400 rounded-2xl border border-brand-500/20 shadow-glow">
+                        <!-- SVG: Satellite Signal Grid -->
+                        <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 009 11a13.92 13.92 0 00-2.327-7.614l-.055-.09A13.916 13.916 0 009 11a13.92 13.92 0 002.327 7.614z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11a13.92 13.92 0 01-2.327 7.614l-.055.09A13.916 13.916 0 0115 11c0-3.517 1.009-6.799 2.753-9.571m-3.44 2.04l-.054.09A13.916 13.916 0 0015 11c0 3.517 1.009 6.799 2.753 9.571z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-base tracking-tight leading-tight">GPS TRACKER PRO</h1>
+                        <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Real-time HUD System</p>
+                    </div>
+                </div>
+                
+                <!-- ไฟบอกสถานะเรียบหรู -->
+                <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+                    <span id="status-text" class="text-[10px] tracking-wide uppercase">กำลังเริ่มระบบ...</span>
+                </div>
+            </div>
 
-            if (savedExpenses) {
-                expenses = JSON.parse(savedExpenses);
-            } else {
-                // Pre-populate with realistic travel costs
-                expenses = [
-                    { id: 1, title: 'ตั๋วรถมินิบัสไปพัทยา', category: 'travel', amount: 150 },
-                    { id: 2, title: 'ตั๋วเรือข้ามฟากพัทยา-เกาะล้าน', category: 'travel', amount: 60 },
-                    { id: 3, title: 'มัดจำที่พักคืนแรก', category: 'hotel', amount: 1200 },
-                    { id: 4, title: 'มื้อค่ำอาหารทะเล', category: 'food', amount: 800 }
-                ];
-            }
-            updateBudgetUI();
+            <!-- ส่วนข้อมูลและควบคุมย่อย (Scrollable Contents) -->
+            <div class="p-5 flex-1 overflow-y-auto space-y-4">
+                
+                <!-- โซน 1: พิกัด และความเร็วรูปแบบ HUD สุดโมเดิร์น -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ละติจูด (Latitude)</span>
+                        <span id="lat-val" class="text-base font-bold font-numbers text-slate-800 mt-1 block">-</span>
+                    </div>
+                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl">
+                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ลองจิจูด (Longitude)</span>
+                        <span id="lon-val" class="text-base font-bold font-numbers text-slate-800 mt-1 block">-</span>
+                    </div>
+                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ระยะทางสะสม</span>
+                            <span id="distance-val" class="text-lg font-bold font-numbers text-brand-600 mt-1 block">0 ม.</span>
+                        </div>
+                    </div>
+                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl flex flex-col justify-between">
+                        <div>
+                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ความเร็วเดินทาง</span>
+                            <span id="speed-val" class="text-lg font-bold font-numbers text-slate-800 mt-1 block">0.0 กม./ชม.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- โซนระยะห่างจากพิกัดบ้าน (Distance from Home HUD) -->
+                <div class="bg-indigo-50/70 border-2 border-indigo-100/80 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-indigo-500/10">
+                        <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="relative z-10">
+                        <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                            ระยะห่างจากพิกัดบ้าน
+                        </span>
+                        <span id="home-distance-val" class="text-2xl font-bold font-numbers text-indigo-700 mt-1 block">- กม.</span>
+                    </div>
+                    <button id="btn-focus-home" class="relative z-10 p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-indigo-glow transition-all active:scale-95 flex items-center justify-center gap-1.5 text-xs font-semibold" title="เลื่อนแผนที่ไปที่บ้าน">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        <span>ดูบ้าน</span>
+                    </button>
+                </div>
+
+                <!-- โซน 2: กล่องข้อมูลสถานที่ไทยอัจฉริยะ (Smart Location) -->
+                <div class="bg-gradient-to-br from-brand-50 to-blue-50/30 rounded-2xl p-4.5 border border-brand-100/50 relative overflow-hidden">
+                    <div class="absolute -right-6 -bottom-6 text-brand-500/5 opacity-10">
+                        <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path></svg>
+                    </div>
+                    
+                    <h3 class="text-xs font-bold text-brand-900 flex items-center space-x-2 mb-3 tracking-wide">
+                        <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span>พิกัดตำแหน่งระบุทางภูมิศาสตร์</span>
+                    </h3>
+                    
+                    <div class="space-y-2 relative z-10">
+                        <div class="flex justify-between items-center border-b border-brand-100/50 pb-2">
+                            <span class="text-xs text-slate-500">ตำบล / แขวง</span>
+                            <span id="addr-suburb" class="text-xs font-bold text-slate-800 text-right">-</span>
+                        </div>
+                        <div class="flex justify-between items-center border-b border-brand-100/50 pb-2">
+                            <span class="text-xs text-slate-500">อำเภอ / เขต</span>
+                            <span id="addr-district" class="text-xs font-bold text-slate-800 text-right">-</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs text-slate-500">จังหวัด</span>
+                            <span id="addr-province" class="text-xs font-bold text-slate-800 text-right">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- โซน 3: แผงควบคุมและส่งออกข้อมูล (KML Export Area) -->
+                <div class="space-y-3">
+                    <!-- ปุ่มส่งออก KML ตัวเอกหลัก -->
+                    <button id="btn-export-kml" class="w-full flex items-center justify-center space-x-2.5 p-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-semibold text-sm transition-all shadow-glow duration-300 transform hover:-translate-y-0.5 active:translate-y-0">
+                        <!-- SVG: Download icon -->
+                        <svg class="w-5 h-5 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        <span>ดาวน์โหลดเส้นทางเป็นไฟล์ KML</span>
+                    </button>
+
+                    <!-- การควบคุมระบบติดตาม -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <!-- ปุ่มเริ่ม/หยุด GPS -->
+                        <button id="btn-toggle-tracking" class="flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 font-semibold text-xs transition-all hover:bg-rose-100">
+                            <span id="tracking-status-dot" class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                            <span id="tracking-status-text">หยุดติดตามชั่วคราว</span>
+                        </button>
+                        
+                        <!-- ปุ่มลบประวัติเส้นทาง -->
+                        <button id="btn-clearhistory" class="flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs transition-all font-semibold">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-11v0a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                            <span>ล้างประวัติแผนที่</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ข้อมูลทางเทคนิคเชิงลึกส่วนท้าย -->
+            <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span id="sys-accuracy">ความแม่นยำสูงสุด: -</span>
+                <span class="flex items-center space-x-1">
+                    <span class="inline-block w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+                    <span>HTTPS Secure</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- ปุ่มสำหรับซ่อน/แสดงแผงควบคุมบนมือถือเพื่อเพิ่มพื้นที่จอกว้าง -->
+        <button id="btn-minimize" class="mt-3 mx-auto md:mx-0 w-28 bg-slate-900/90 text-white font-semibold text-[11px] uppercase tracking-wider py-2 px-3 rounded-full shadow-premium flex items-center justify-center space-x-1.5 border border-white/10 backdrop-blur-sm transition-all duration-300 hover:bg-slate-950 active:scale-95">
+            <span id="minimize-text">ซ่อนแผงควบคุม</span>
+            <svg id="minimize-icon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+    </div>
+
+    <!-- ส่วนที่ 2: ปุ่มลอยสำหรับการล็อกตำแหน่งและการควบคุมแผนที่เชิงลึก (Quick Actions Floating Panel) -->
+    <div class="absolute bottom-6 right-6 z-[1000] flex flex-col space-y-3">
+        <!-- ปุ่มสลับ Layer แผนที่ (ปกติ / ดาวเทียม Google Satellite Hybrid) -->
+        <button id="btn-toggle-layer" class="w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-700 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90" title="สลับแผนที่ดาวเทียม / แผนที่ปกติ">
+            <!-- Icon: Layers / Maps -->
+            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+            </svg>
+        </button>
+
+        <!-- ปุ่มสลับ Auto-Center ล็อกตำแหน่งผู้ใช้ตรงกลางกล้องเสมอ -->
+        <button id="btn-autocenter" class="w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-brand-600 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90" title="ล็อกตำแหน่งให้อยู่ตรงกลาง">
+            <svg id="autocenter-icon" class="w-6 h-6 animate-spin-slow text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+            </svg>
+        </button>
+
+        <!-- กลุ่มควบคุมระดับซูมแบบพรีเมียม -->
+        <div class="flex flex-col bg-white/90 backdrop-blur-md rounded-2xl shadow-premium border border-white/40 overflow-hidden">
+            <button id="btn-zoom-in" class="w-12 h-12 hover:bg-slate-50 text-slate-800 flex items-center justify-center font-bold text-xl transition-all border-b border-slate-100 active:scale-90">+</button>
+            <button id="btn-zoom-out" class="w-12 h-12 hover:bg-slate-50 text-slate-800 flex items-center justify-center font-bold text-xl transition-all active:scale-90">−</button>
+        </div>
+    </div>
+
+    <!-- แผงแจ้งเตือนแบบลอยล้ำสมัย (Premium Toast Alert) -->
+    <div id="warning-toast" class="hidden absolute top-6 left-1/2 -translate-x-1/2 z-[2000] bg-red-500/95 backdrop-blur-md text-white font-medium text-xs px-5 py-3.5 rounded-2xl shadow-premium flex items-center space-x-3 transition-all duration-300 border border-red-400/20 max-w-sm">
+        <svg class="w-5 h-5 flex-shrink-0 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+        <span id="warning-text">ความเชื่อมโยงกับเซ็นเซอร์ตำแหน่งขัดข้อง</span>
+        <button onclick="closeWarning()" class="text-white hover:text-red-200 focus:outline-none font-bold text-sm ml-3">✕</button>
+    </div>
+
+    <!-- Leaflet Map JS CDN -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // ==========================================
+        // 1. กำหนดตัวแปรหลักสำหรับการทำงานของแอปพลิเคชัน
+        // ==========================================
+        let map;
+        let userMarker = null;       // หมุดที่ระบุพิกัดปัจจุบันของผู้ใช้
+        let accuracyCircle = null;   // วงกลมบอกระดับรัศมีจำกัดความแม่นยำของ GPS
+        let watchId = null;          // ตัวชี้คอยติดตามพิกัดใน watchPosition
+        let autoCenter = true;       // ล็อกมุมกล้องของแผนที่ไว้ตรงกลางตำแหน่งล่าสุดเสมอ
+        let isTrackingActive = true; // Status สำหรับหยุด/เริ่มติดตาม GPS
+        let pathHistory = [];        // จัดเก็บอาร์เรย์ของจุดพิกัดเพื่อวาดเส้นและส่งออก KML
+        let routePolyline = null;    // Object ของเส้นทางบนแผนที่ Leaflet
+        let totalDistance = 0;       // ระยะทางการเดินทางสะสมเชิงพิกัด (เมตร)
+        let lastGeocodeTime = 0;     // เวลาการสืบค้นชื่อที่อยู่ล่าสุด (ประหยัดพลังงานยิง API)
+        let lastFetchedCoords = { lat: 0, lon: 0 }; // พิกัดสำหรับตรวจสอบการเคลื่อนตัวขั้นต่ำ
+
+        // กำหนดพิกัดจุดบ้านถาวร (พิกัดตามที่คุณกำหนด : 15.729789, 102.294175)
+        const HOME_LAT = 15.729789;
+        const HOME_LON = 102.294175;
+        let homeMarker = null;       // เก็บ Object หมุดบ้าน
+
+        // เลเยอร์แผนที่ (Map Layers)
+        let osmLayer;                // แผนที่ถนนปกติ OpenStreetMap
+        let googleSatelliteLayer;    // แผนที่ภาพถ่ายดาวเทียมแบบไฮบริด (Google Satellite Hybrid)
+        let currentLayerType = 'osm'; // ประเภทเลเยอร์ที่กำลังใช้งานขณะนั้น ('osm' หรือ 'satellite')
+
+        // ==========================================
+        // 2. การเริ่มระบบทั้งหมดเมื่อพร้อม (Application Initializations)
+        // ==========================================
+        window.addEventListener('DOMContentLoaded', () => {
+            initMap();
+            startTracking();
+            setupInteractiveEvents();
+        });
+
+        // กำหนดรายละเอียดพื้นฐานและการเชื่อมโยงแผนที่
+        function initMap() {
+            // สร้างแผนที่และระบุจุดพิกัดกึ่งกลางเริ่มต้นไว้ที่พิกัดบ้าน
+            map = L.map('map', {
+                zoomControl: false,
+                attributionControl: true
+            }).setView([HOME_LAT, HOME_LON], 13);
+
+            // 2.1 กำหนดเลเยอร์แผนที่ถนนมาตรฐาน (OpenStreetMap)
+            osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            });
+
+            // 2.2 กำหนดเลเยอร์ภาพถ่ายดาวเทียมไฮบริด (Google Hybrid Map: s = satellite, y = hybrid)
+            googleSatelliteLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+                maxZoom: 20,
+                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+                attribution: '&copy; Google Maps'
+            });
+
+            // เพิ่มเลเยอร์ OpenStreetMap เป็นค่าเริ่มต้น
+            osmLayer.addTo(map);
+
+            // ปักหมุดพิกัดจุดบ้านถาวร ด้วยไอคอนสไตล์พรีเมียมสี Indigo และกล่องข้อความป๊อปอัพ
+            const homeIcon = L.divIcon({
+                className: 'custom-home-marker',
+                html: `<div class="w-9 h-9 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-indigo-glow border-2 border-white transition-all transform hover:scale-110">
+                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                         </svg>
+                       </div>`,
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
+
+            homeMarker = L.marker([HOME_LAT, HOME_LON], { icon: homeIcon }).addTo(map);
+            homeMarker.bindPopup(`
+                <div class="p-1">
+                    <span class="text-indigo-600 font-bold block text-sm">🏡 บ้านของฉัน (Home Base)</span>
+                    <span class="text-[11px] text-slate-500 font-numbers block mt-1">LAT: ${HOME_LAT}<br>LON: ${HOME_LON}</span>
+                </div>
+            `);
+
+            // สร้างเลเยอร์เส้นทางที่จะระบุบนแผนที่
+            routePolyline = L.polyline([], {
+                color: '#2563eb',     // สีน้ำเงินหลัก
+                weight: 6,            // ความหนาเส้น
+                opacity: 0.85,         // ความโปร่งแสง
+                lineJoin: 'round',
+                lineCap: 'round'
+            }).addTo(map);
+
+            // เมื่อผู้ใช้สัมผัสหรือลากเลื่อนแผนที่ด้วยตัวเอง จะปิด Auto-Center อัตโนมัติทันที
+            map.on('dragstart', () => {
+                setAutoCenter(false);
+            });
         }
 
-        // Set Trip Budget
-        function setTripBudget() {
-            const val = document.getElementById('input-budget-setting').value;
-            if (val && !isNaN(val) && parseFloat(val) >= 0) {
-                tripBudget = parseFloat(val);
-                localStorage.setItem('tripBudget', tripBudget);
-                updateBudgetUI();
-                alertToast("แก้ไขจำนวนงบประมาณสำเร็จ!");
-            } else {
-                alertToast("กรุณากรอกจำนวนงบประมาณที่ถูกต้อง!");
-            }
-        }
+        // ==========================================
+        // 3. ระบบติดตามพิกัด Geolocation API Logic
+        // ==========================================
+        function startTracking() {
+            if (!isTrackingActive) return;
 
-        // Add Expense Entry
-        function addExpense() {
-            const titleInput = document.getElementById('expense-title');
-            const categorySelect = document.getElementById('expense-category');
-            const amountInput = document.getElementById('expense-amount');
-
-            const title = titleInput.value.trim();
-            const category = categorySelect.value;
-            const amount = parseFloat(amountInput.value);
-
-            if (!title) {
-                alertToast("กรุณากรอกรายละเอียดของรายการ!");
-                return;
-            }
-            if (isNaN(amount) || amount <= 0) {
-                alertToast("กรุณาระบุจำนวนเงินที่มากกว่า 0 บาท!");
+            if (!("geolocation" in navigator)) {
+                showWarning("เบราว์เซอร์นี้ไม่รองรับระบบประมวลผลตำแหน่ง Geolocation");
+                updateSystemStatus('error', 'ไม่รองรับระบบ GPS');
                 return;
             }
 
-            const newExpense = {
-                id: Date.now(),
-                title: title,
-                category: category,
-                amount: amount
+            const geoOptions = {
+                enableHighAccuracy: true,  // ร้องขอความแม่นยำสูงสุดจากชิป GPS ของอุปกรณ์
+                timeout: 12000,            // ระยะเวลาประมวลผลตำแหน่งไม่เกิน 12 วินาที
+                maximumAge: 0              // ไม่ดึงพิกัดจากแคชเก่า บังคับหาพิกัดจริงเรียลไทม์
             };
 
-            expenses.push(newExpense);
-            localStorage.setItem('tripExpenses', JSON.stringify(expenses));
+            updateSystemStatus('pending', 'กำลังค้นหาสัญญาณ...');
 
-            // Reset inputs
-            titleInput.value = '';
-            amountInput.value = '';
-
-            updateBudgetUI();
-            alertToast("บันทึกข้อมูลรายจ่ายสำเร็จ!");
-        }
-
-        // Delete Expense Entry
-        function deleteExpense(id) {
-            expenses = expenses.filter(exp => exp.id !== id);
-            localStorage.setItem('tripExpenses', JSON.stringify(expenses));
-            updateBudgetUI();
-            alertToast("ลบรายการรายจ่ายแล้ว");
-        }
-
-        // Clear All Data
-        function clearAllExpenses() {
-            expenses = [];
-            tripBudget = 5000;
-            document.getElementById('input-budget-setting').value = tripBudget;
-            localStorage.removeItem('tripExpenses');
-            localStorage.removeItem('tripBudget');
-            updateBudgetUI();
-            alertToast("รีเซ็ตระบบและล้างประวัติสำเร็จ!");
-        }
-
-        // Filter Function
-        function filterExpenses(category) {
-            currentFilter = category;
-            
-            // Highlight active button using premium style
-            const categories = ['all', 'travel', 'hotel', 'food'];
-            categories.forEach(cat => {
-                const btn = document.getElementById(`filter-${cat}`);
-                if (btn) {
-                    if (cat === category) {
-                        btn.className = "px-3 py-1.5 text-[10px] font-bold rounded-lg transition-all duration-150 bg-slate-900 text-white";
-                    } else {
-                        btn.className = "px-3 py-1.5 text-[10px] font-bold rounded-lg text-slate-500 hover:text-slate-900 transition-all duration-150";
-                    }
-                }
-            });
-
-            renderExpenseList();
-        }
-
-        // Calculate Totals and Render UI
-        function updateBudgetUI() {
-            // Update Dashboard cards
-            document.getElementById('display-budget').textContent = tripBudget.toLocaleString('th-TH');
-
-            const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
-            document.getElementById('display-total-expense').textContent = totalExpense.toLocaleString('th-TH');
-
-            const remaining = tripBudget - totalExpense;
-            const displayRemaining = document.getElementById('display-remaining-budget');
-            displayRemaining.textContent = remaining.toLocaleString('th-TH');
-
-            const remainingContainer = document.getElementById('div-remaining-container');
-            if (remaining < 0) {
-                remainingContainer.className = "text-3xl font-black mt-2 text-rose-500 animate-pulse";
-            } else {
-                remainingContainer.className = "text-3xl font-black mt-2 text-slate-900";
-            }
-
-            // Calculations per standard categories
-            const travelTotal = expenses.filter(e => e.category === 'travel').reduce((s, i) => s + i.amount, 0);
-            const hotelTotal = expenses.filter(e => e.category === 'hotel').reduce((s, i) => s + i.amount, 0);
-            const foodTotal = expenses.filter(e => e.category === 'food').reduce((s, i) => s + i.amount, 0);
-
-            document.getElementById('badge-cat-travel').textContent = travelTotal.toLocaleString('th-TH');
-            document.getElementById('badge-cat-hotel').textContent = hotelTotal.toLocaleString('th-TH');
-            document.getElementById('badge-cat-food').textContent = foodTotal.toLocaleString('th-TH');
-
-            // Calculate percentage of budget used
-            let percentUsed = 0;
-            if (tripBudget > 0) {
-                percentUsed = Math.min(Math.round((totalExpense / tripBudget) * 100), 100);
-            }
-            
-            document.getElementById('txt-budget-percent').textContent = `${percentUsed}%`;
-            
-            const progressBar = document.getElementById('bar-budget-percent');
-            progressBar.style.width = `${percentUsed}%`;
-
-            // Modern subtle feedback colors based on budget limits
-            if (percentUsed >= 95) {
-                progressBar.className = "bg-rose-500 h-1.5 rounded-full transition-all duration-300";
-            } else if (percentUsed >= 80) {
-                progressBar.className = "bg-amber-400 h-1.5 rounded-full transition-all duration-300";
-            } else {
-                progressBar.className = "bg-sky-500 h-1.5 rounded-full transition-all duration-300";
-            }
-
-            renderExpenseList();
-        }
-
-        // Render table list based on selected filter
-        function renderExpenseList() {
-            const tableBody = document.getElementById('expense-table-body');
-            tableBody.innerHTML = '';
-
-            const filteredExpenses = currentFilter === 'all' 
-                ? expenses 
-                : expenses.filter(e => e.category === currentFilter);
-
-            if (filteredExpenses.length === 0) {
-                tableBody.innerHTML = `
-                    <tr>
-                        <td colspan="4" class="py-16 text-center text-slate-400">
-                            <div class="text-3xl mb-2 opacity-55">🏖️</div>
-                            <p class="text-xs text-slate-400 font-semibold">ไม่พบข้อมูลรายจ่ายในส่วนของหมวดหมู่นี้</p>
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-
-            filteredExpenses.forEach(exp => {
-                let categoryName = "อื่นๆ";
-                let categoryColorClass = "bg-slate-100 text-slate-700";
-
-                switch(exp.category) {
-                    case 'travel':
-                        categoryName = "🚗 การเดินทาง";
-                        categoryColorClass = "bg-blue-50 text-blue-600 border border-blue-100";
-                        break;
-                    case 'hotel':
-                        categoryName = "🏨 ที่พักรีสอร์ท";
-                        categoryColorClass = "bg-indigo-50 text-indigo-600 border border-indigo-100";
-                        break;
-                    case 'food':
-                        categoryName = "🍲 มื้ออาหาร";
-                        categoryColorClass = "bg-amber-50 text-amber-700 border border-amber-100";
-                        break;
-                    case 'activity':
-                        categoryName = "🤿 กิจกรรมชายหาด";
-                        categoryColorClass = "bg-cyan-50 text-cyan-600 border border-cyan-100";
-                        break;
-                    case 'shopping':
-                        categoryName = "🎁 ซื้อของฝาก";
-                        categoryColorClass = "bg-rose-50 text-rose-600 border border-rose-100";
-                        break;
-                }
-
-                const row = document.createElement('tr');
-                row.className = "hover:bg-slate-50/50 transition border-b border-slate-100";
-                row.innerHTML = `
-                    <td class="py-4 pl-3 font-semibold text-slate-800">${escapeHTML(exp.title)}</td>
-                    <td class="py-4">
-                        <span class="px-2.5 py-1 rounded-lg text-[10px] font-bold ${categoryColorClass}">
-                            ${categoryName}
-                        </span>
-                    </td>
-                    <td class="py-4 text-right font-bold text-slate-900">฿${exp.amount.toLocaleString('th-TH')}</td>
-                    <td class="py-4 text-center">
-                        <button onclick="deleteExpense(${exp.id})" class="text-slate-400 hover:text-rose-500 p-2 rounded-xl hover:bg-rose-50 transition duration-150">
-                            <i class="fa-solid fa-trash-can text-sm"></i>
-                        </button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-
-        // Premium toast alert style instead of standard browser alerts
-        function alertToast(message) {
-            // Remove existing toasts first to prevent stacks
-            const existing = document.querySelectorAll('.toast-alert');
-            existing.forEach(t => t.remove());
-
-            const toastContainer = document.createElement('div');
-            toastContainer.className = "toast-alert fixed bottom-6 right-6 z-[999] bg-slate-900 text-white text-xs px-5 py-3.5 rounded-xl shadow-2xl border border-slate-800 flex items-center gap-3 animate-slide-up";
-            toastContainer.innerHTML = `
-                <div class="w-2 h-2 rounded-full bg-cyan-400"></div>
-                <span class="font-medium tracking-wide">${message}</span>
-            `;
-            document.body.appendChild(toastContainer);
-            
-            setTimeout(() => {
-                toastContainer.classList.add('opacity-0', 'transition-opacity', 'duration-300');
-                setTimeout(() => toastContainer.remove(), 300);
-            }, 3000);
-        }
-
-        function escapeHTML(str) {
-            return str.replace(/[&<>'"]/g, 
-                tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+            // ติดตามการเคลื่อนไหวและดึงค่าพิกัดใหม่เสมอเมื่อตำแหน่งขยับ
+            watchId = navigator.geolocation.watchPosition(
+                handleGeoSuccess,
+                handleGeoError,
+                geoOptions
             );
         }
 
-        // Live Clock and Ferry Suggestion Calculator
-        function updateLiveClock() {
-            const now = new Date();
-            let hours = now.getHours();
-            let minutes = now.getMinutes();
-            let seconds = now.getSeconds();
+        // เมื่อดึงข้อมูลพิกัดดาวเทียมสำเร็จ
+        function handleGeoSuccess(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const accuracy = position.coords.accuracy;
+            const speed = position.coords.speed; // คืนค่าความเร็ว m/s
 
-            // Format time
-            hours = hours < 10 ? '0' + hours : hours;
-            minutes = minutes < 10 ? '0' + minutes : minutes;
-            seconds = seconds < 10 ? '0' + seconds : seconds;
+            // แสดงผลพิกัดลงหน้าจอแผงควบคุมหลัก
+            document.getElementById('lat-val').innerText = lat.toFixed(6);
+            document.getElementById('lon-val').innerText = lon.toFixed(6);
+            document.getElementById('sys-accuracy').innerText = `ความแม่นยำสูงสุด: ± ${Math.round(accuracy)} เมตร`;
 
-            const timeString = `${hours}:${minutes}:${seconds}`;
-            const clockEl = document.getElementById('liveClock');
-            if (clockEl) {
-                clockEl.textContent = timeString;
-            }
-
-            // Simple ferry recommender based on current time
-            const nextFerryEl = document.getElementById('nextFerrySuggest');
-            const currentHourFloat = parseFloat(hours) + (parseFloat(minutes) / 60);
-            
-            let suggestion = "07:00 น. (วันพรุ่งนี้)";
-            if (currentHourFloat < 7) {
-                suggestion = "07:00 น. (รอบแรกวันนี้)";
-            } else if (currentHourFloat < 9.5) {
-                suggestion = "09:30 น.";
-            } else if (currentHourFloat < 11.5) {
-                suggestion = "11:30 น.";
-            } else if (currentHourFloat < 13) {
-                suggestion = "13:00 น.";
-            } else if (currentHourFloat < 14.5) {
-                suggestion = "14:30 น.";
-            } else if (currentHourFloat < 18.5) {
-                suggestion = "18:30 น. (รอบสุดท้ายวันนี้)";
+            // คำนวณความเร็ว (เมตรต่อวินาที -> กิโลเมตรต่อชั่วโมง)
+            if (speed && speed > 0.3) { 
+                const speedKmh = (speed * 3.6).toFixed(1);
+                document.getElementById('speed-val').innerText = `${speedKmh} กม./ชม.`;
             } else {
-                suggestion = "07:00 น. (วันพรุ่งนี้)";
+                document.getElementById('speed-val').innerText = '0.0 กม./ชม.';
             }
 
-            if (nextFerryEl) {
-                nextFerryEl.textContent = suggestion;
-            }
+            // คำนวณระยะห่างจากพิกัดบ้านและแสดงผลบน HUD
+            const homeDistMeters = calculateDistance(lat, lon, HOME_LAT, HOME_LON);
+            const homeDistKm = (homeDistMeters / 1000).toFixed(2);
+            document.getElementById('home-distance-val').innerText = `${homeDistKm} กม.`;
+
+            updateSystemStatus('connected', 'ใช้งานเรียบร้อย');
+
+            const currentLatLng = [lat, lon];
+            updateTrackingOnMap(currentLatLng, accuracy);
+
+            // แปลงพิกัดเป็นที่อยู่ภาษาไทยตามระยะทางและเวลาที่กำหนดไว้ป้องกันปัญหา API บล็อก
+            triggerReverseGeocoding(lat, lon);
         }
 
-        // Fullscreen simulation for Map
-        let isFullscreen = false;
-        function fullscreenMap() {
-            const container = document.getElementById('mapContainer');
-            if (!isFullscreen) {
-                container.classList.remove('h-[450px]', 'md:h-[550px]');
-                container.classList.add('h-[650px]');
-                isFullscreen = true;
-                alertToast("ขยายการแสดงผลแผนที่");
-            } else {
-                container.classList.remove('h-[650px]');
-                container.classList.add('h-[450px]', 'md:h-[550px]');
-                isFullscreen = false;
-                alertToast("ย่อการแสดงผลแผนที่กลับสู่สภาพเดิม");
+        // จัดการเมื่อเปิด/ดึงพิกัดผิดพลาด
+        function handleGeoError(error) {
+            let errorMsg = "ไม่สามารถเชื่อมต่อตัวระบุตำแหน่งได้";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMsg = "ผู้ใช้ปฏิเสธการเข้าถึงพิกัด กรุณาเปิดระบบระบุพิกัดในเบราว์เซอร์";
+                    updateSystemStatus('error', 'ถูกปฏิเสธสิทธิ์');
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMsg = "ไม่มีสัญญาณระบุพิกัดในจุดที่ท่านอยู่ขณะนี้";
+                    updateSystemStatus('error', 'สูญเสียสัญญาณ GPS');
+                    break;
+                case error.TIMEOUT:
+                    errorMsg = "ค้นหาตําแหน่งหมดเวลา เนื่องจากพิกัดดาวเทียมตอบสนองช้า";
+                    updateSystemStatus('error', 'หมดเวลาระบุตำแหน่ง');
+                    break;
+                default:
+                    updateSystemStatus('error', 'ระบบขัดข้อง');
             }
+            showWarning(errorMsg);
         }
 
-        // Bali Hai Pier Latitude/Longitude
-        const BALI_HAI_LAT = 12.925556;
-        const BALI_HAI_LNG = 100.868222;
+        // ==========================================
+        // 4. การแสดงร่องรอยการเคลื่อนไหวบนแผนที่
+        // ==========================================
+        function updateTrackingOnMap(latLng, accuracy) {
+            // สไตล์หมุดปัจจุบันเรืองแสงสีฟ้า
+            const pulsingIcon = L.divIcon({
+                className: 'gps-pulse-marker',
+                iconSize: [36, 36],
+                iconAnchor: [18, 18]
+            });
 
-        function getUserLocation() {
-            const btn = document.getElementById('btn-get-location');
-            const details = document.getElementById('location-details');
-            const errorBlock = document.getElementById('location-error');
-            const txtCoords = document.getElementById('txt-coords');
-            const txtDistance = document.getElementById('txt-distance');
-            const txtDuration = document.getElementById('txt-duration');
-            const btnNavigate = document.getElementById('btn-navigate');
+            if (!userMarker) {
+                // สร้างหมุดตำแหน่งผู้ใช้และขอบเขตความคลาดเคลื่อน (วงกลม) เป็นครั้งแรก
+                userMarker = L.marker(latLng, { icon: pulsingIcon }).addTo(map);
+                
+                accuracyCircle = L.circle(latLng, {
+                    radius: accuracy,
+                    color: '#3b82f6',
+                    fillColor: '#3b82f6',
+                    fillOpacity: 0.12,
+                    weight: 1
+                }).addTo(map);
 
-            // Reset UI States
-            errorBlock.classList.add('hidden');
-            details.classList.add('hidden');
-            btn.disabled = true;
-            btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> กำลังตรวจหาพิกัด...`;
-
-            if (!navigator.geolocation) {
-                showLocationError("เบราว์เซอร์หรืออุปกรณ์นี้ไม่สนับสนุนการหาพิกัด GPS");
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    const lat = position.coords.latitude;
-                    const lng = position.coords.longitude;
-                    
-                    // Display details
-                    txtCoords.textContent = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-
-                    // Calculate distance to Bali Hai Pier
-                    const distance = calculateHaversineDistance(lat, lng, BALI_HAI_LAT, BALI_HAI_LNG);
-                    txtDistance.textContent = `${distance.toFixed(1)} กม.`;
-
-                    // Estimate driving time duration (based on average speed of 75 km/h + standard buffer)
-                    let hours = distance / 75;
-                    let mins = Math.round((hours % 1) * 60);
-                    let hoursFloor = Math.floor(hours);
-                    let durationText = "";
-                    
-                    if (hoursFloor > 0) {
-                        durationText = `ประมาณ ${hoursFloor} ชม. ${mins} นาที`;
-                    } else {
-                        durationText = `ประมาณ ${mins} นาที`;
-                    }
-                    txtDuration.textContent = durationText;
-
-                    // Generate navigation path from user current location to Bali Hai Pier
-                    btnNavigate.href = `https://www.google.com/maps/dir/?api=1&origin=${lat},${lng}&destination=${BALI_HAI_LAT},${BALI_HAI_LNG}&travelmode=driving`;
-
-                    // Success Feedback
-                    btn.disabled = false;
-                    btn.innerHTML = `<i class="fa-solid fa-check"></i> ดึงพิกัดสำเร็จ`;
-                    btn.className = "w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer";
-                    details.classList.remove('hidden');
-                    alertToast("คำนวณระยะทางไปเกาะล้านเสร็จสิ้น!");
-                },
-                (error) => {
-                    let errMsg = "ไม่สามารถเชื่อมต่อสัญญาณ GPS ได้ กรุณาเปิดระบบระบุตำแหน่งของอุปกรณ์";
-                    switch (error.code) {
-                        case error.PERMISSION_DENIED:
-                            errMsg = "คุณปฏิเสธสิทธิ์การเข้าถึงพิกัดที่ตั้ง โปรดอนุญาตสิทธิ์การใช้งานเพื่อคำนวณระยะทาง";
-                            break;
-                        case error.POSITION_UNAVAILABLE:
-                            errMsg = "ไม่สามารถระบุพิกัดในพื้นที่ปิดหรือจุดอับสัญญาณได้";
-                            break;
-                        case error.TIMEOUT:
-                            errMsg = "ดึงข้อมูลพิกัดหมดเวลา โปรดตรวจสอบสัญญาณเครือข่ายอินเทอร์เน็ต";
-                            break;
-                    }
-                    showLocationError(errMsg);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 10000,
-                    maximumAge: 0
+                // หากตั้งเป็นล็อกหน้าจอกลางไว้ให้เปลี่ยนมุมกล้องหาผู้ใช้ทันที
+                if (autoCenter) {
+                    map.setView(latLng, 16);
                 }
-            );
+            } else {
+                // อัปเดตพิกัดหมุดปัจจุบันและขอบเขตความคลาดเคลื่อน
+                userMarker.setLatLng(latLng);
+                accuracyCircle.setLatLng(latLng);
+                accuracyCircle.setRadius(accuracy);
+
+                if (autoCenter) {
+                    map.panTo(latLng);
+                }
+            }
+
+            // คำนวณระยะทางสะสมถัดไป (ป้องกันปัญหาสัญญาณลอยสั่นในระยะต่ำกว่า 3 เมตร)
+            if (pathHistory.length > 0) {
+                const lastPoint = pathHistory[pathHistory.length - 1];
+                const deltaDist = calculateDistance(lastPoint[0], lastPoint[1], latLng[0], latLng[1]);
+                
+                if (deltaDist > 3) {
+                    totalDistance += deltaDist;
+                    pathHistory.push(latLng);
+                    routePolyline.setLatLngs(pathHistory);
+                    
+                    updateDistanceDisplay(totalDistance);
+                }
+            } else {
+                pathHistory.push(latLng);
+            }
         }
 
-        function showLocationError(msg) {
-            const btn = document.getElementById('btn-get-location');
-            const errorBlock = document.getElementById('location-error');
-            const txtError = document.getElementById('txt-error');
-
-            btn.disabled = false;
-            btn.innerHTML = `<i class="fa-solid fa-rotate-right"></i> พยายามดึงพิกัดอีกครั้ง`;
-            btn.className = "w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer";
-            
-            txtError.textContent = msg;
-            errorBlock.classList.remove('hidden');
-            alertToast("เกิดข้อผิดพลาดในการดึงพิกัด");
+        // ปรับการแสดงผลระยะทางสะสม
+        function updateDistanceDisplay(meters) {
+            const distanceText = document.getElementById('distance-val');
+            if (meters >= 1000) {
+                const km = (meters / 1000).toFixed(2);
+                distanceText.innerText = `${km} กม.`;
+            } else {
+                distanceText.innerText = `${Math.round(meters)} ม.`;
+            }
         }
 
-        // Haversine formula to compute geodesic distance on earth
-        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Earth's Radius in Kilometers
-            const dLat = deg2rad(lat2 - lat1);
-            const dLon = deg2rad(lon2 - lon1);
-            const a = 
-                Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        // ==========================================
+        // 5. ระบบแปลงพิกัดเป็นชื่อสถานที่ภาษาไทย (Reverse Geocoding Logic)
+        // ==========================================
+        async function triggerReverseGeocoding(lat, lon) {
+            const now = Date.now();
+            const distanceShift = calculateDistance(lat, lon, lastFetchedCoords.lat, lastFetchedCoords.lon);
+
+            // ทำงานเมื่อเคลื่อนที่ห่างจากตำแหน่งเก่าเกิน 15 เมตร หรือระยะเวลาห่างกันเกิน 12 วินาทีขึ้นไป
+            if (now - lastGeocodeTime > 12000 || distanceShift > 15) {
+                lastGeocodeTime = now;
+                lastFetchedCoords = { lat, lon };
+
+                setAddressUIStatus("กำลังค้นหาที่อยู่ภาษาไทย...");
+
+                try {
+                    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=th`;
+                    const response = await fetch(url, {
+                        headers: { 'User-Agent': 'ModernGPSTrackingHUDSystem/2.0' }
+                    });
+
+                    if (!response.ok) throw new Error('API request failed');
+
+                    const data = await response.json();
+                    
+                    if (data && data.address) {
+                        const addr = data.address;
+
+                        const suburb = addr.suburb || addr.village || addr.neighborhood || addr.subdistrict || addr.town || 'ไม่ระบุพื้นที่';
+                        const district = addr.district || addr.city_district || addr.city || addr.county || addr.amphoe || 'ไม่ระบุเขต';
+                        const province = addr.state || addr.province || addr.region || 'ไม่ระบุจังหวัด';
+
+                        document.getElementById('addr-suburb').innerText = cleanPrefix(suburb);
+                        document.getElementById('addr-district').innerText = cleanPrefix(district);
+                        document.getElementById('addr-province').innerText = cleanPrefix(province);
+                    } else {
+                        setAddressUIStatus("ไม่พบข้อมูลอาคารในรัศมีพิกัด");
+                    }
+                } catch (err) {
+                    console.error("Geocoding Error:", err);
+                    setAddressUIStatus("การสืบค้นข้อมูลที่อยู่ขัดข้อง");
+                }
+            }
+        }
+
+        function setAddressUIStatus(msg) {
+            document.getElementById('addr-suburb').innerText = msg;
+            document.getElementById('addr-district').innerText = '...';
+            document.getElementById('addr-province').innerText = '...';
+        }
+
+        function cleanPrefix(text) {
+            if (!text) return '-';
+            return text.replace('Tambon', '').replace('Amphoe', '').replace('Amphur', '').replace('District', '').trim();
+        }
+
+        // คำนวณระยะห่างระหว่างจุดพิกัดในสูตรคณิตศาสตร์เชิงมุม Haversine (เมตร)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371000; // รัศมีโลกเฉลี่ย (เมตร)
+            const phi1 = lat1 * Math.PI/180;
+            const phi2 = lat2 * Math.PI/180;
+            const deltaPhi = (lat2-lat1) * Math.PI/180;
+            const deltaLambda = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
+                      Math.cos(phi1) * Math.cos(phi2) *
+                      Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
             return R * c;
         }
 
-        function deg2rad(deg) {
-            return deg * (Math.PI / 180);
+        // ==========================================
+        // 6. การส่งออกประวัติเส้นทางการเดินทางจริงเป็น KML
+        // ==========================================
+        function downloadRouteAsKML() {
+            if (pathHistory.length === 0) {
+                showWarning("ไม่พบข้อมูลเส้นทางสำหรับการจัดเก็บประวัติและส่งออก");
+                return;
+            }
+
+            let kmlData = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>GPS Path Tracking Route</name>
+    <description>ไฟล์พิกัดบันทึกเส้นทางเดินเรียลไทม์ ดาวน์โหลดผ่าน GPS PRO Web App</description>
+    <Style id="customPolyline">
+      <LineStyle>
+        <color>ffea3e3b</color>
+        <width>6</width>
+      </LineStyle>
+      <PolyStyle>
+        <fill>0</fill>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>เส้นทางการเดินทางจริง</name>
+      <styleUrl>#customPolyline</styleUrl>
+      <LineString>
+        <tessellate>1</tessellate>
+        <coordinates>
+`;
+
+            pathHistory.forEach(point => {
+                const lat = Array.isArray(point) ? point[0] : point.lat;
+                const lon = Array.isArray(point) ? point[1] : point.lng;
+                kmlData += `          ${lon},${lat},0\n`;
+            });
+
+            kmlData += `        </coordinates>
+      </LineString>
+    </Placemark>
+  </Document>
+</kml>`;
+
+            const blob = new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
+            const downloadUrl = URL.createObjectURL(blob);
+            const downloadLink = document.createElement('a');
+            
+            const timestamp = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
+            
+            downloadLink.href = downloadUrl;
+            downloadLink.download = `GPS_Tracker_Route_${timestamp}.kml`;
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            URL.revokeObjectURL(downloadUrl);
         }
 
-        // Start Live Timer and updates on window load
-        window.onload = function() {
-            updateLiveClock();
-            setInterval(updateLiveClock, 1000);
-            loadSavedBudgetData();
-        };
+        // ==========================================
+        // 7. การทำงานของปุ่มควบคุมและหน้าตาการตอบรับ (Interactive Event Handlers)
+        // ==========================================
+        function setupInteractiveEvents() {
+            // ปุ่มดาวน์โหลดไฟล์เส้นทาง KML
+            document.getElementById('btn-export-kml').addEventListener('click', downloadRouteAsKML);
+
+            // ปุ่มสลับเลเยอร์แผนที่ (ปกติ / ดาวเทียม Google Satellite Hybrid)
+            document.getElementById('btn-toggle-layer').addEventListener('click', () => {
+                const btnLayer = document.getElementById('btn-toggle-layer');
+                
+                if (currentLayerType === 'osm') {
+                    // ลบเลเยอร์ OSM และแทนที่ด้วยเลเยอร์ดาวเทียม Google Hybrid
+                    map.removeLayer(osmLayer);
+                    googleSatelliteLayer.addTo(map);
+                    currentLayerType = 'satellite';
+                    
+                    // ปรับแต่ง UI ปุ่มเปลี่ยนเลเยอร์ให้ดูลอยตัวตัดแสงอย่างสวยงาม
+                    btnLayer.className = "w-12 h-12 bg-indigo-600 text-white rounded-2xl shadow-indigo-glow border border-indigo-400 flex items-center justify-center transition-all duration-300 transform active:scale-90";
+                    btnLayer.querySelector('svg').className = "w-6 h-6 text-white";
+                } else {
+                    // ลบเลเยอร์ดาวเทียม Google และแทนที่ด้วยเลเยอร์ OSM ปกติ
+                    map.removeLayer(googleSatelliteLayer);
+                    osmLayer.addTo(map);
+                    currentLayerType = 'osm';
+                    
+                    btnLayer.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-700 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90";
+                    btnLayer.querySelector('svg').className = "w-6 h-6 text-brand-600";
+                }
+            });
+
+            // ปุ่มย่อ/ขยายแผงแผงควบคุมหลัก
+            const btnMinimize = document.getElementById('btn-minimize');
+            const dashboardCard = document.getElementById('dashboard-card');
+            const minimizeText = document.getElementById('minimize-text');
+            const minimizeIcon = document.getElementById('minimize-icon');
+            let isMinimized = false;
+
+            btnMinimize.addEventListener('click', () => {
+                isMinimized = !isMinimized;
+                if (isMinimized) {
+                    dashboardCard.querySelector('.bg-white\\/90').classList.add('hidden');
+                    minimizeText.innerText = "เปิดแผงควบคุม";
+                    minimizeIcon.classList.add('rotate-180');
+                } else {
+                    dashboardCard.querySelector('.bg-white\\/90').classList.remove('hidden');
+                    minimizeText.innerText = "ซ่อนแผงควบคุม";
+                    minimizeIcon.classList.remove('rotate-180');
+                }
+            });
+
+            // ปุ่มเริ่ม/หยุดติดตาม GPS ชั่วคราว
+            const btnToggleTracking = document.getElementById('btn-toggle-tracking');
+            btnToggleTracking.addEventListener('click', () => {
+                isTrackingActive = !isTrackingActive;
+                const statusDot = document.getElementById('tracking-status-dot');
+                const statusText = document.getElementById('tracking-status-text');
+
+                if (isTrackingActive) {
+                    btnToggleTracking.className = "flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 font-semibold text-xs transition-all hover:bg-rose-100";
+                    statusDot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
+                    statusText.innerText = "หยุดติดตามชั่วคราว";
+                    startTracking();
+                } else {
+                    btnToggleTracking.className = "flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 font-semibold text-xs transition-all hover:bg-emerald-100";
+                    statusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
+                    statusText.innerText = "เริ่มระบบติดตาม";
+                    
+                    if (watchId !== null) {
+                        navigator.geolocation.clearWatch(watchId);
+                        watchId = null;
+                    }
+                    updateSystemStatus('pending', 'หยุดติดตามพิกัดแล้ว');
+                }
+            });
+
+            // ปุ่มเลื่อนมุมมองกล้องแผนที่ไปที่พิกัดบ้าน
+            document.getElementById('btn-focus-home').addEventListener('click', () => {
+                setAutoCenter(false);
+                map.setView([HOME_LAT, HOME_LON], 17);
+                if (homeMarker) {
+                    homeMarker.openPopup();
+                }
+            });
+
+            // ปุ่มล้างเส้นประวัติการเดินทางบนแผนที่
+            document.getElementById('btn-clearhistory').addEventListener('click', () => {
+                pathHistory = [];
+                totalDistance = 0;
+                updateDistanceDisplay(0);
+                if (routePolyline) {
+                    routePolyline.setLatLngs([]);
+                }
+                if (userMarker) {
+                    pathHistory.push(userMarker.getLatLng());
+                }
+            });
+
+            // ปุ่มควบคุมการซูมและจัดศูนย์กลาง
+            document.getElementById('btn-zoom-in').addEventListener('click', () => map.zoomIn());
+            document.getElementById('btn-zoom-out').addEventListener('click', () => map.zoomOut());
+
+            const btnAutoCenter = document.getElementById('btn-autocenter');
+            btnAutoCenter.addEventListener('click', () => {
+                setAutoCenter(!autoCenter);
+                if (autoCenter && userMarker) {
+                    map.setView(userMarker.getLatLng(), 16);
+                }
+            });
+        }
+
+        // ฟังก์ชันอัปเดตสถานะการล็อกหน้าจอกลาง
+        function setAutoCenter(active) {
+            autoCenter = active;
+            const btn = document.getElementById('btn-autocenter');
+            const icon = document.getElementById('autocenter-icon');
+            
+            if (active) {
+                btn.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-brand-600 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90";
+                icon.className = "w-6 h-6 animate-spin-slow text-brand-600";
+            } else {
+                btn.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-400 rounded-2xl shadow-premium border border-slate-100 flex items-center justify-center transition-all duration-300 transform active:scale-90";
+                icon.className = "w-6 h-6 text-slate-400";
+            }
+        }
+
+        // จัดการและอัปเดตแผงบอกประเภทสัญญาณ
+        function updateSystemStatus(type, message) {
+            const badge = document.getElementById('status-badge');
+            const statusText = document.getElementById('status-text');
+            statusText.innerText = message;
+
+            if (type === 'connected') {
+                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping";
+            } else if (type === 'error') {
+                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-red-500/10 text-red-400 border border-red-500/20";
+                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-red-500";
+            } else if (type === 'pending') {
+                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-amber-500/10 text-amber-400 border border-amber-500/20";
+                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
+            }
+        }
+
+        // ฟังก์ชันป๊อปอัพแจ้งเตือนแบบด่วน (Toast Alert)
+        function showWarning(text) {
+            const toast = document.getElementById('warning-toast');
+            document.getElementById('warning-text').innerText = text;
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                closeWarning();
+            }, 6000);
+        }
+
+        function closeWarning() {
+            const toast = document.getElementById('warning-toast');
+            toast.classList.add('hidden');
+        }
     </script>
 </body>
 </html>
-```
-eof
-
-ระบบได้อัปเดตและปรับแต่งสไตล์ให้เข้ากับการเดินทางสไตล์ท่องเที่ยวเกาะล้านที่มีทั้งความน่ารัก มินิมอล มีฟังก์ชันเรียลไทม์ครบครัน เรียบร้อยแล้วครับ! สามารถทดสอบการเพิ่มค่าใช้จ่าย กำหนดงบ และคำนวณ GPS ได้ทันทีเลยครับ
