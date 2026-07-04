@@ -49,6 +49,7 @@
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
             background-color: #ffffff;
             margin-bottom: 24px;
+            overflow: hidden;
             transition: transform 0.2s, box-shadow 0.2s;
         }
 
@@ -83,12 +84,18 @@
         .bg-expense { background-color: #fce8e6; color: #d93025; }
         .bg-balance { background-color: #e6f4ea; color: #137333; }
 
-        /* Leaflet Map Height */
+        /* Leaflet Map Height & Layout without Overlays */
         #map {
             height: 480px;
-            border-radius: 12px;
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+            width: 100%;
             z-index: 1;
+        }
+
+        /* Responsive dividers for Map info footer */
+        @media (min-width: 768px) {
+            .border-end-md {
+                border-right: 1px solid #dee2e6 !important;
+            }
         }
 
         /* Custom Badges */
@@ -96,22 +103,6 @@
             font-size: 0.8rem;
             padding: 6px 12px;
             border-radius: 20px;
-        }
-
-        /* Quick Info Overlay on Map (Collapsible) */
-        .map-overlay {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            z-index: 1000;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
-            width: 280px;
-            font-size: 0.85rem;
-            backdrop-filter: blur(5px);
-            transition: all 0.3s ease;
         }
 
         /* Oil price and Weather cards */
@@ -139,7 +130,7 @@
             text-align: center;
         }
 
-        /* Floating Indicator for GPS Simulation status */
+        /* Floating Indicator for GPS tracking status */
         .status-dot {
             width: 10px;
             height: 10px;
@@ -150,7 +141,7 @@
         }
 
         @keyframes pulse {
-            0 { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
             70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
             100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
         }
@@ -337,8 +328,8 @@
             <!-- RIGHT COLUMN: GPS Tracking & Live Map -->
             <div class="col-lg-8 col-md-12">
                 
-                <!-- ส่วนที่ 2: ระบบแผนที่ติดตามอุปกรณ์ (GPS Tracking) -->
-                <div class="card position-relative">
+                <!-- ส่วนที่ 2: ระบบแผนที่ติดตามอุปกรณ์ (GPS Tracking - ปรับใหม่ไม่มี Overlay บังแผนที่) -->
+                <div class="card">
                     <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
                         <div class="d-flex align-items-center">
                             <span class="status-dot me-2"></span>
@@ -356,37 +347,50 @@
                             </button>
                         </div>
                     </div>
+                    
+                    <!-- แผนที่ดาวเทียมเต็มจอไม่มีอะไรบดบัง -->
                     <div class="card-body p-0 position-relative">
-                        <!-- แผนที่ Leaflet -->
                         <div id="map"></div>
-                        
-                        <!-- หน้าต่างซ้อนทับแผนที่ (Map Info Overlay) - ปรับให้พับเก็บได้ -->
-                        <div class="map-overlay" id="mapOverlay">
-                            <div class="d-flex justify-content-between align-items-center border-bottom pb-1 mb-2">
-                                <span class="fw-bold text-primary"><i class="fa-solid fa-info-circle me-1"></i>ข้อมูลพิกัดจริง</span>
-                                <button class="btn btn-sm p-0 border-0" onclick="toggleOverlay()" id="btnToggleOverlay" title="ย่อ/ขยายกล่องข้อความ">
-                                    <i class="fa-solid fa-chevron-down text-secondary" id="overlayIcon"></i>
-                                </button>
+                    </div>
+                    
+                    <!-- ย้ายข้อมูลแสดงพิกัดมาจัดระเบียบด้านล่างแผนที่แทนการใช้ Overlay บังภาพ -->
+                    <div class="card-footer bg-light p-4 border-top">
+                        <div class="row g-3">
+                            <div class="col-md-4 border-end-md">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fa-solid fa-satellite-dish text-danger fs-5 me-2"></i>
+                                    <span class="fw-bold text-secondary">ตำแหน่งปัจจุบัน (Real GPS)</span>
+                                </div>
+                                <div id="liveCoords" class="text-monospace fs-6 fw-bold text-dark">กำลังค้นหาสัญญาณ...</div>
                             </div>
                             
-                            <div id="overlayContent">
-                                <div class="mb-1">
-                                    <strong>ตำแหน่งปัจจุบัน (Real GPS):</strong><br>
-                                    <span id="liveCoords" class="text-monospace text-break">กำลังรับสัญญาณ...</span>
+                            <div class="col-md-4 border-end-md">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fa-solid fa-house-chimney text-success fs-5 me-2"></i>
+                                    <span class="fw-bold text-secondary">ระยะห่างจากพิกัด "บ้าน"</span>
                                 </div>
-                                <div class="mb-1">
-                                    <strong>ระยะห่างจาก "บ้าน":</strong><br>
-                                    <span class="badge bg-primary fs-7" id="distanceText">คำนวณจากพิกัด...</span>
+                                <div>
+                                    <span class="badge bg-primary fs-6 px-3 py-1-5 rounded" id="distanceText">คำนวณจากพิกัด...</span>
                                 </div>
-                                <div class="mb-1">
-                                    <strong>พื้นที่ตั้งปัจจุบัน (Geocoding):</strong><br>
-                                    <span class="text-success fw-bold" id="locationAddress">กำลังค้นหาชื่อที่อยู่...</span>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="fa-solid fa-map-location-dot text-primary fs-5 me-2"></i>
+                                    <span class="fw-bold text-secondary">พื้นที่ตั้งปัจจุบัน (Geocoding)</span>
                                 </div>
-                                <div class="mt-2 text-center">
-                                    <button class="btn btn-xs btn-outline-dark w-100 py-1" style="font-size: 0.75rem" onclick="toggleLockCenter()">
-                                        <i class="fa-solid fa-lock" id="lockIcon"></i> <span id="lockText">ปลดล็อกกึ่งกลาง</span>
-                                    </button>
-                                </div>
+                                <div class="fw-bold text-success fs-6" id="locationAddress">กำลังดึงข้อมูลที่อยู่...</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3 pt-3 border-top align-items-center">
+                            <div class="col-sm-8 text-muted small">
+                                <i class="fa-solid fa-circle-info me-1"></i> ระบบกำลังติดตามตำแหน่งจริงของอุปกรณ์คุณ และจะวาดเส้นทางการเคลื่อนไหวให้อัตโนมัติเมื่อเกิดการขยับพิกัด
+                            </div>
+                            <div class="col-sm-4 text-sm-end mt-2 mt-sm-0">
+                                <button class="btn btn-sm btn-outline-dark" onclick="toggleLockCenter()">
+                                    <i class="fa-solid fa-lock" id="lockIcon"></i> <span id="lockText">ปลดล็อกกึ่งกลาง</span>
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -618,19 +622,6 @@
         let lastGeocodeTime = 0;
         let lastWeatherTime = 0;
 
-        // ฟังก์ชันย่อ/ขยายกล่องข้อความแผนที่
-        function toggleOverlay() {
-            const content = document.getElementById('overlayContent');
-            const icon = document.getElementById('overlayIcon');
-            if (content.style.display === 'none') {
-                content.style.display = 'block';
-                icon.className = 'fa-solid fa-chevron-down text-secondary';
-            } else {
-                content.style.display = 'none';
-                icon.className = 'fa-solid fa-chevron-up text-secondary';
-            }
-        }
-
         // ฟังก์ชันคำนวณระยะทางแบบ Haversine Formula (กิโลเมตร)
         function getHaversineDistance(coords1, coords2) {
             const [lat1, lon1] = coords1;
@@ -775,7 +766,7 @@
             );
         }
 
-        // ฟังก์ชันระบบเมื่อเกิดข้อผิดพลาดในการดึงตำแหน่ง หรือใช้พิกัดจำลองพิกัดคงที่
+        // ฟังก์ชันระบบเมื่อเกิดข้อผิดพลาดในการดึงตำแหน่ง หรือใช้พิกัดเริ่มต้น
         function useFallbackMock() {
             stopRealTracking();
             // นำพิกัดเริ่มต้นไปวาง
@@ -849,7 +840,7 @@
         function updateTrackerStats() {
             const latStr = currentCoords[0].toFixed(6);
             const lonStr = currentCoords[1].toFixed(6);
-            document.getElementById('liveCoords').innerHTML = `<span class="text-danger fw-bold">${latStr}</span>,<br><span class="text-primary fw-bold">${lonStr}</span>`;
+            document.getElementById('liveCoords').innerHTML = `<span class="text-danger fw-bold">${latStr}</span>, <span class="text-primary fw-bold">${lonStr}</span>`;
 
             // คำนวณด้วย Haversine
             const distance = getHaversineDistance(HOME_COORDS, currentCoords);
@@ -901,7 +892,7 @@
 
 
         // ==========================================
-        //  ฟังก์ชันแปลงเส้นทางจำลองและส่งออก KML
+        //  ฟังก์ชันแปลงเส้นทางและส่งออก KML
         // ==========================================
         function downloadKML() {
             if (trackingPath.length < 1) {
