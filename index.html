@@ -1274,13 +1274,52 @@
         // 6. GOOGLE MAPS MODULE (ส่วนที่ 2: แสดงพิกัดอุปกรณ์แบบเรียลไทม์)
         // =========================================================================
         
+        // ฟังก์ชันสร้างรูปรถยนต์ Dynamic SVG ตามทิศทาง Heading เพื่อปักหมุดบนแผนที่ Google Maps (รองรับการหันหน้าเลี้ยวรถ)
+        function getCarIcon(heading) {
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="44" height="44">
+                    <g transform="rotate(${heading} 12 12)">
+                        <!-- สปอยเลอร์/ส่วนยื่นด้านข้าง (ล้อสีดำหนา) -->
+                        <rect x="2.5" y="5" width="2" height="4.5" rx="1" fill="#1e293b"/>
+                        <rect x="19.5" y="5" width="2" height="4.5" rx="1" fill="#1e293b"/>
+                        <rect x="2.5" y="14.5" width="2" height="4.5" rx="1" fill="#1e293b"/>
+                        <rect x="19.5" y="14.5" width="2" height="4.5" rx="1" fill="#1e293b"/>
+                        
+                        <!-- โครงสร้างหลักตัวรถนำทางสไตล์สปอร์ตสีน้ำเงิน -->
+                        <path d="M5.5 8c0-3 1.5-4.5 4-4.5h5c2.5 0 4 1.5 4 4.5v9c0 3-1.5 4.5-4 4.5h-5c-2.5 0-4-1.5-4-4.5V8z" fill="#2563eb" stroke="#ffffff" stroke-width="1.5"/>
+                        
+                        <!-- กระจกหน้าบังลม (หันไปทิศทางหน้ารถ/ด้านบน) -->
+                        <path d="M7.5 8.5c0-1.2 0.8-1.8 1.8-1.8h5.4c1 0 1.8 0.6 1.8 1.8V11H7.5V8.5z" fill="#93c5fd"/>
+                        
+                        <!-- กระจกหลังคาซันรูฟ -->
+                        <rect x="8.5" y="11.8" width="7" height="3" rx="0.5" fill="#1e3a8a" opacity="0.6"/>
+                        
+                        <!-- กระจกหลังบังลม -->
+                        <path d="M7.5 16c0-0.5 0.5-1 1.5-1h6c1 0 1.5 0.5 1.5 1v1.5H7.5V16z" fill="#93c5fd"/>
+                        
+                        <!-- ไฟหน้าสว่างสีเหลือง -->
+                        <circle cx="8.5" cy="4.2" r="1" fill="#fef08a"/>
+                        <circle cx="15.5" cy="4.2" r="1" fill="#fef08a"/>
+                        
+                        <!-- ไฟท้ายสีแดงส้ม -->
+                        <rect x="8" y="21.3" width="1.8" height="0.8" rx="0.2" fill="#ef4444"/>
+                        <rect x="14.2" y="21.3" width="1.8" height="0.8" rx="0.2" fill="#ef4444"/>
+                    </g>
+                </svg>
+            `;
+            return {
+                url: `data:image/svg+xml;utf-8,${encodeURIComponent(svg)}`,
+                anchor: new google.maps.Point(22, 22), // กึ่งกลางตัวรถพอดีเพื่อให้หมุนได้รอบทิศ
+                scaledSize: new google.maps.Size(44, 44)
+            };
+        }
+
         function injectGoogleMapsScript() {
             // ดึง API Key
             const apiKey = APP_CONFIG.googleMapsKey;
             
             if (!apiKey) {
                 // หากไม่มี Key ให้แสดงแผนที่จำลองโดยไม่ต้องเรียก Google Maps จริง
-                // หรือแจ้งให้ผู้ใช้เห็นว่าควรกรอก Key
                 setupFallbackMap();
                 return;
             }
@@ -1296,19 +1335,45 @@
             document.head.appendChild(script);
         }
 
-        // ตัวแปรสำหรับทำ Fallback จำลองแผนที่บนเบราว์เซอร์กรณีไม่มี API Key (เพื่อความสะดวกและรันได้ 100% เสมอ)
+        // ตัวแปรสำหรับทำ Fallback จำลองแผนที่บนเบราว์เซอร์กรณีไม่มี API Key (พร้อมแผงรถยนต์หันเลี้ยวจริง)
         function setupFallbackMap() {
             const container = document.getElementById('map-canvas');
             container.innerHTML = `
-                <div class="absolute inset-0 bg-slate-800 flex flex-col items-center justify-center text-center p-6 text-white">
-                    <div class="p-4 bg-slate-700/50 rounded-2xl border border-slate-600 max-w-md">
-                        <i class="fa-solid fa-satellite-dish text-4xl text-blue-400 mb-3 animate-pulse"></i>
-                        <h4 class="font-bold text-sm mb-2">Google Maps SDK Simulator</h4>
+                <div class="absolute inset-0 bg-slate-800 flex flex-col items-center justify-center text-center p-6 text-white overflow-hidden">
+                    <!-- ลวดลายพื้นผิว Grid นำทางเสมือนจริง -->
+                    <div class="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#808080_1px,transparent_1px),linear-gradient(to_bottom,#808080_1px,transparent_1px)] bg-[size:24px_24px]"></div>
+                    
+                    <div class="relative p-5 bg-slate-900/85 backdrop-blur-md rounded-2xl border border-slate-700 max-w-md shadow-2xl z-10 transition-all">
+                        <!-- ตัวควบคุมแอนิเมชันรูปรถหมุนจริงแบบเรียลไทม์ -->
+                        <div class="mb-4 relative w-24 h-24 mx-auto flex items-center justify-center rounded-full bg-blue-500/10 border-2 border-dashed border-blue-500/30">
+                            <div id="fallback-car-icon" class="transition-transform duration-300 transform" style="transform: rotate(0deg)">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="54" height="54">
+                                    <rect x="2.5" y="5" width="2" height="4.5" rx="1" fill="#475569"/>
+                                    <rect x="19.5" y="5" width="2" height="4.5" rx="1" fill="#475569"/>
+                                    <rect x="2.5" y="14.5" width="2" height="4.5" rx="1" fill="#475569"/>
+                                    <rect x="19.5" y="14.5" width="2" height="4.5" rx="1" fill="#475569"/>
+                                    <path d="M5.5 8c0-3 1.5-4.5 4-4.5h5c2.5 0 4 1.5 4 4.5v9c0 3-1.5 4.5-4 4.5h-5c-2.5 0-4-1.5-4-4.5V8z" fill="#3b82f6" stroke="#ffffff" stroke-width="1.5"/>
+                                    <path d="M7.5 8.5c0-1.2 0.8-1.8 1.8-1.8h5.4c1 0 1.8 0.6 1.8 1.8V11H7.5V8.5z" fill="#93c5fd"/>
+                                    <rect x="8.5" y="11.8" width="7" height="3" rx="0.5" fill="#1e3a8a" opacity="0.6"/>
+                                    <path d="M7.5 16c0-0.5 0.5-1 1.5-1h6c1 0 1.5 0.5 1.5 1v1.5H7.5V16z" fill="#93c5fd"/>
+                                    <circle cx="8.5" cy="4.2" r="1" fill="#fef08a"/>
+                                    <circle cx="15.5" cy="4.2" r="1" fill="#fef08a"/>
+                                    <rect x="8" y="21.3" width="1.8" height="0.8" rx="0.2" fill="#ef4444"/>
+                                    <rect x="14.2" y="21.3" width="1.8" height="0.8" rx="0.2" fill="#ef4444"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <h4 class="font-bold text-sm mb-2 flex items-center justify-center">
+                            <i class="fa-solid fa-satellite-dish text-blue-400 mr-2 animate-pulse"></i>
+                            Google Maps SDK Simulator
+                        </h4>
                         <p class="text-xs text-slate-300 leading-relaxed">
-                            ระบบทำงานในโหมด "จำลองแผนที่" เนื่องจากไม่ได้ระบุ Google Maps API Key <br>
-                            แต่คุณยังคงเห็นตำแหน่งอุปกรณ์, ทิศทาง และการคำนวณระยะห่างทางคณิตศาสตร์จากพิกัดจำลอง <br>
-                            รวมทั้งตรวจสอบข้อมูลที่อยู่ (Reverse Geocoding) แบบ Mock ได้ทันที!
+                            ระบบทำงานในโหมด "จำลองพิกัดเสมือนจริง" เนื่องจากไม่ได้ระบุ Google Maps API Key <br>
+                            แต่คุณยังคงเห็นตำแหน่งอุปกรณ์เคลื่อนที่ ทิศทางการเลี้ยว และรูปรถด้านบนหมุนตามองศาจริง!
                         </p>
+                        <div class="mt-3 text-[10px] text-blue-400 font-mono" id="fallback-telemetry">
+                            LAT: 15.729762 | LNG: 102.294181 | HDG: 180°
+                        </div>
                     </div>
                 </div>
             `;
@@ -1345,14 +1410,12 @@
                 }
             });
 
-            // หมุดตำแหน่งอุปกรณ์เคลื่อนที่
+            // หมุดตำแหน่งอุปกรณ์เคลื่อนที่ (ติดตั้งรูปรถยนต์ SVG สปอร์ตนำร่องเป็นครั้งแรก)
             gMarker = new google.maps.Marker({
                 position: initPos,
                 map: gMap,
                 title: 'อุปกรณ์พิกัดปัจจุบัน',
-                icon: {
-                    url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                }
+                icon: getCarIcon(dbState.deviceGPS.heading)
             });
 
             // จัดการล็อกตำแหน่งกึ่งกลางแผนที่
@@ -1387,7 +1450,7 @@
 
         // ฟังก์ชันคำนวณระยะห่างระหว่างจุด 2 จุดด้วยสูตร Haversine (กิโลเมตร)
         function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // รัศมีเฉลี่ยโลก (กิโลเมตร)
+            const R = 6371; // รัศมีโลกเฉลี่ย (กิโลเมตร)
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = 
@@ -1416,7 +1479,7 @@
             document.getElementById('dash-distance').textContent = distance.toFixed(2) + ' km';
             document.getElementById('txt-distance-val').textContent = distance.toFixed(2) + ' km';
             
-            // อัปเดตข้อมูลพิกัด
+            // อัปเดตข้อมูลพิกัดบนแผงควบคุมหลัก
             document.getElementById('txt-gps-coords').textContent = `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}`;
             document.getElementById('txt-gps-speed-dir').textContent = `${gps.speed.toFixed(1)} km/h | ${headingToDirectionThai(gps.heading)}`;
             
@@ -1424,14 +1487,27 @@
             const tObj = new Date(gps.timestamp);
             document.getElementById('txt-gps-time').textContent = tObj.toLocaleTimeString('th-TH');
 
-            // อัปเดตหมุดบนแผนที่ Google Maps ถ้าโหลดสำเร็จ
+            // อัปเดตรูปรถยนต์เลี้ยวและเคลื่อนไหวบน Google Maps
             if (gMap && gMarker) {
                 const newPos = { lat: gps.lat, lng: gps.lng };
                 gMarker.setPosition(newPos);
                 
+                // สั่งเปลี่ยนรูปตัวรถยนต์และมุมองศาการเลี้ยว (Dynamic SVG Heading)
+                gMarker.setIcon(getCarIcon(gps.heading));
+                
                 if (dbState.isLockCenter) {
                     gMap.panTo(newPos);
                 }
+            }
+
+            // จัดการข้อมูลแสดงผล Simulator บนหน้าจอเรดาร์จำลอง (กรณีไม่มี Key)
+            const fallbackCar = document.getElementById('fallback-car-icon');
+            const fallbackTel = document.getElementById('fallback-telemetry');
+            if (fallbackCar) {
+                fallbackCar.style.transform = `rotate(${gps.heading}deg)`;
+            }
+            if (fallbackTel) {
+                fallbackTel.textContent = `LAT: ${gps.lat.toFixed(6)} | LNG: ${gps.lng.toFixed(6)} | HDG: ${gps.heading.toFixed(0)}°`;
             }
 
             // ทำการหาข้อมูลที่อยู่ (Reverse Geocoding)
