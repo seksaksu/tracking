@@ -1,823 +1,1867 @@
 <!DOCTYPE html>
-<html lang="th" class="h-full">
+<html lang="th" class="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>GPS Tracking HUD & Route Exporter</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Trip & Device Tracker Dashboard</title>
+    <!-- Fonts: Prompt & Kanit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
+            darkMode: 'class',
             theme: {
                 extend: {
-                    colors: {
-                        slate: {
-                            950: '#030712'
-                        },
-                        brand: {
-                            50: '#f0f7ff',
-                            100: '#e0effe',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            900: '#1e3a8a',
-                        }
+                    fontFamily: {
+                        sans: ['Prompt', 'Kanit', 'sans-serif'],
                     },
                     boxShadow: {
-                        'premium': '0 10px 40px -10px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
-                        'glow': '0 0 20px rgba(59, 130, 246, 0.35)',
-                        'indigo-glow': '0 0 20px rgba(79, 70, 229, 0.3)',
+                        'glass-light': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+                        'glass-dark': '0 8px 32px 0 rgba(0, 0, 0, 0.37)',
                     }
                 }
             }
         }
     </script>
 
-    <!-- Leaflet Map CSS CDN -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Google Fonts (Sarabun & Space Grotesk) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght=500;700&family=Sarabun:wght=300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
+        /* Custom Modern CSS & Glassmorphism Utilities */
         body {
-            font-family: 'Sarabun', sans-serif;
+            font-family: 'Prompt', 'Kanit', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
-        .font-numbers {
-            font-family: 'Space Grotesk', sans-serif;
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.45);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        /* ซ่อนปุ่มซูมมาตรฐานของ Leaflet เพื่อใช้ UI ดีไซน์ใหม่ของเรา */
-        .leaflet-control-zoom {
-            display: none !important;
+
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
-        /* แอนิเมชันจุดพัลส์พิกัดแบบเรืองแสง 3 มิติ (Glowing Aura Coordinate Marker) */
-        .gps-pulse-marker {
-            position: relative;
+
+        .glass-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.12);
         }
-        .gps-pulse-marker::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 14px;
-            height: 14px;
-            background: #2563eb;
-            border: 2.5px solid #ffffff;
-            border-radius: 50%;
-            box-shadow: 0 0 12px rgba(37, 99, 235, 0.8);
+
+        .dark .glass-card:hover {
+            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.5);
         }
-        .gps-pulse-marker::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 36px;
-            height: 36px;
-            background: rgba(37, 99, 235, 0.3);
-            border-radius: 50%;
-            animation: pulse-ring 2.2s cubic-bezier(0.1, 0.8, 0.3, 1) infinite;
-        }
-        @keyframes pulse-ring {
-            0% { transform: translate(-50%, -50%) scale(0.35); opacity: 0.9; }
-            80%, 100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
-        }
-        /* ซ่อนแถบเลื่อนบนเบราว์เซอร์ */
+
+        /* Custom Scrollbar */
         ::-webkit-scrollbar {
-            width: 4px;
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
         }
         ::-webkit-scrollbar-thumb {
-            background: rgba(156, 163, 175, 0.3);
-            border-radius: 2px;
+            background: rgba(156, 163, 175, 0.5);
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(156, 163, 175, 0.8);
+        }
+        
+        /* Map height adjustment */
+        #map-container {
+            height: 450px;
         }
     </style>
 </head>
-<body class="h-full w-full overflow-hidden bg-slate-950 relative">
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen pb-12">
 
-    <!-- พื้นที่แสดงแผนที่แบบเต็มหน้าจอ (Base Layer) -->
-    <div id="map" class="absolute inset-0 w-full h-full z-0"></div>
+    <!-- Header / Navigation Bar -->
+    <header class="sticky top-0 z-40 w-full bg-white/75 dark:bg-slate-900/75 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-xl text-white shadow-md shadow-blue-500/20">
+                    <i class="fa-solid fa-compass text-xl animate-spin-slow"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-300 bg-clip-text text-transparent">SmartTrip IoT</h1>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">ระบบติดตามอุปกรณ์และบันทึกทริปอัจฉริยะ</p>
+                </div>
+            </div>
 
-    <!-- ส่วนที่ 1: แผงควบคุมลอยตัวระดับพรีเมียม (Floating Glassmorphism Dashboard) -->
-    <div id="dashboard-card" class="absolute top-4 left-4 right-4 md:right-auto md:w-96 max-h-[calc(100vh-2rem)] z-[1000] flex flex-col transition-all duration-500 transform ease-in-out">
-        
-        <!-- ตัวแผงหลัก (Main Glass Panel) -->
-        <div class="bg-white/90 backdrop-blur-xl border border-white/40 shadow-premium rounded-3xl overflow-hidden flex flex-col max-h-[85vh] md:max-h-[88vh]">
-            
-            <!-- ส่วนหัว (Header Card) -->
-            <div class="p-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between border-b border-white/10 relative overflow-hidden">
-                <div class="absolute -right-6 -top-6 w-24 h-24 bg-brand-500/10 rounded-full blur-2xl"></div>
-                <div class="flex items-center space-x-3.5 relative z-10">
-                    <div class="p-2.5 bg-brand-600/20 text-brand-400 rounded-2xl border border-brand-500/20 shadow-glow">
-                        <!-- SVG: Satellite Signal Grid -->
-                        <svg class="w-6 h-6 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 009 11a13.92 13.92 0 00-2.327-7.614l-.055-.09A13.916 13.916 0 009 11a13.92 13.92 0 002.327 7.614z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M19 11a13.92 13.92 0 01-2.327 7.614l-.055.09A13.916 13.916 0 0115 11c0-3.517 1.009-6.799 2.753-9.571m-3.44 2.04l-.054.09A13.916 13.916 0 0015 11c0 3.517 1.009 6.799 2.753 9.571z"></path>
-                        </svg>
+            <div class="flex items-center space-x-4">
+                <!-- Live Clock -->
+                <div class="hidden md:flex items-center space-x-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    <i class="fa-regular fa-clock text-blue-500"></i>
+                    <span id="header-clock">--:--:--</span>
+                </div>
+
+                <!-- Dark/Light Mode Toggle -->
+                <button id="theme-toggle" class="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all text-slate-600 dark:text-slate-300">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 space-y-6">
+
+        <!-- ==================== DASHBOARD OVERVIEW CARDS ==================== -->
+        <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Card 1: Balance -->
+            <div class="glass-card p-4 rounded-2xl flex items-center space-x-4">
+                <div class="p-3 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                    <i class="fa-solid fa-wallet text-2xl"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs text-slate-500 dark:text-slate-400">เงินคงเหลือ</p>
+                    <h3 id="dash-balance" class="text-lg md:text-xl font-bold text-slate-800 dark:text-white truncate">0.00 ฿</h3>
+                    <div class="text-[10px] text-slate-400">ปรับปรุงล่าสุดอัตโนมัติ</div>
+                </div>
+            </div>
+
+            <!-- Card 2: Income / Expense Mini Summary -->
+            <div class="glass-card p-4 rounded-2xl flex items-center space-x-4">
+                <div class="p-3 bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                    <i class="fa-solid fa-right-left text-2xl"></i>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs text-slate-500 dark:text-slate-400">รายรับ / รายจ่าย</p>
+                    <div class="flex items-center space-x-2 text-xs md:text-sm mt-0.5">
+                        <span class="text-emerald-600 dark:text-emerald-400 font-bold" id="dash-income">+0 ฿</span>
+                        <span class="text-slate-300 dark:text-slate-600">|</span>
+                        <span class="text-rose-600 dark:text-rose-400 font-bold" id="dash-expense">-0 ฿</span>
+                    </div>
+                    <span id="dash-budget-text" class="text-[10px] text-slate-400 block truncate">งบเริ่มต้น: 0 ฿</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Distance from Home & Current Location -->
+            <div class="glass-card p-4 rounded-2xl flex items-center space-x-4">
+                <div class="p-3 bg-blue-500/10 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400 rounded-xl">
+                    <i class="fa-solid fa-house-signal text-2xl"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs text-slate-500 dark:text-slate-400">ระยะห่างจากบ้าน</p>
+                    <h3 id="dash-distance" class="text-lg md:text-xl font-bold text-slate-800 dark:text-white truncate">0.00 km</h3>
+                    <p id="dash-city" class="text-[10px] text-slate-500 dark:text-slate-400 truncate">กำลังหาพิกัด...</p>
+                </div>
+            </div>
+
+            <!-- Card 4: Weather & Fuel Temp -->
+            <div class="glass-card p-4 rounded-2xl flex items-center space-x-4">
+                <div class="p-3 bg-amber-500/10 dark:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-xl">
+                    <i id="dash-weather-icon" class="fa-solid fa-cloud-sun-rain text-2xl"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs text-slate-500 dark:text-slate-400">สภาพอากาศปัจจุบัน</p>
+                    <h3 id="dash-temp" class="text-lg md:text-xl font-bold text-slate-800 dark:text-white truncate">-- °C</h3>
+                    <p id="dash-fuel" class="text-[10px] text-slate-500 dark:text-slate-400 truncate">โซฮอล์ 95: รอข้อมูล...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- API KEY SETTING DRAWER (สามารถกรอกคีย์เพื่อเปลี่ยนได้แบบ Dynamic) -->
+        <section class="glass-card p-4 rounded-2xl border border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/20">
+            <details class="group">
+                <summary class="flex justify-between items-center font-semibold text-sm cursor-pointer text-blue-600 dark:text-blue-400 select-none">
+                    <span><i class="fa-solid fa-key mr-2"></i> ตั้งค่า API Keys (Google Maps, OpenWeatherMap) และเครื่องจำลองพิกัด</span>
+                    <i class="fa-solid fa-chevron-down group-open:rotate-180 transition-transform"></i>
+                </summary>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+                    <div>
+                        <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">Google Maps API Key</label>
+                        <input id="key-google-maps" type="password" placeholder="ใส่ Google API Key แล้วกดบันทึก" class="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
                     </div>
                     <div>
-                        <h1 class="font-bold text-base tracking-tight leading-tight">GPS TRACKER PRO</h1>
-                        <p class="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5">Real-time HUD System</p>
+                        <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">OpenWeatherMap API Key</label>
+                        <input id="key-weather" type="password" placeholder="ใส่ OpenWeather Key แล้วกดบันทึก" class="w-full text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg p-2 focus:ring-2 focus:ring-blue-500">
                     </div>
-                </div>
-                
-                <!-- ไฟบอกสถานะเรียบหรู -->
-                <div id="status-badge" class="px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                    <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
-                    <span id="status-text" class="text-[10px] tracking-wide uppercase">กำลังเริ่มระบบ...</span>
-                </div>
-            </div>
-
-            <!-- ส่วนข้อมูลและควบคุมย่อย (Scrollable Contents) -->
-            <div class="p-5 flex-1 overflow-y-auto space-y-4">
-                
-                <!-- โซน 1: พิกัด และความเร็วรูปแบบ HUD สุดโมเดิร์น -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl">
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ละติจูด (Latitude)</span>
-                        <span id="lat-val" class="text-base font-bold font-numbers text-slate-800 mt-1 block">-</span>
-                    </div>
-                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl">
-                        <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ลองจิจูด (Longitude)</span>
-                        <span id="lon-val" class="text-base font-bold font-numbers text-slate-800 mt-1 block">-</span>
-                    </div>
-                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl flex flex-col justify-between">
-                        <div>
-                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ระยะทางสะสม</span>
-                            <span id="distance-val" class="text-lg font-bold font-numbers text-brand-600 mt-1 block">0 ม.</span>
-                        </div>
-                    </div>
-                    <div class="bg-slate-50/70 border border-slate-100 p-3.5 rounded-2xl flex flex-col justify-between">
-                        <div>
-                            <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">ความเร็วเดินทาง</span>
-                            <span id="speed-val" class="text-lg font-bold font-numbers text-slate-800 mt-1 block">0.0 กม./ชม.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- โซนระยะห่างจากพิกัดบ้าน (Distance from Home HUD) -->
-                <div class="bg-indigo-50/70 border-2 border-indigo-100/80 rounded-2xl p-4 flex items-center justify-between shadow-sm relative overflow-hidden">
-                    <div class="absolute -right-4 -bottom-4 text-indigo-500/10">
-                        <svg class="w-20 h-20" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"></path>
-                        </svg>
-                    </div>
-                    <div class="relative z-10">
-                        <span class="text-[10px] font-bold text-indigo-500 uppercase tracking-widest flex items-center gap-1.5">
-                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                            ระยะห่างจากพิกัดบ้าน
-                        </span>
-                        <span id="home-distance-val" class="text-2xl font-bold font-numbers text-indigo-700 mt-1 block">- กม.</span>
-                    </div>
-                    <button id="btn-focus-home" class="relative z-10 p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-indigo-glow transition-all active:scale-95 flex items-center justify-center gap-1.5 text-xs font-semibold" title="เลื่อนแผนที่ไปที่บ้าน">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                        </svg>
-                        <span>ดูบ้าน</span>
-                    </button>
-                </div>
-
-                <!-- โซน 2: กล่องข้อมูลสถานที่ไทยอัจฉริยะ (Smart Location) -->
-                <div class="bg-gradient-to-br from-brand-50 to-blue-50/30 rounded-2xl p-4.5 border border-brand-100/50 relative overflow-hidden">
-                    <div class="absolute -right-6 -bottom-6 text-brand-500/5 opacity-10">
-                        <svg class="w-32 h-32" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path></svg>
-                    </div>
-                    
-                    <h3 class="text-xs font-bold text-brand-900 flex items-center space-x-2 mb-3 tracking-wide">
-                        <svg class="w-4 h-4 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span>พิกัดตำแหน่งระบุทางภูมิศาสตร์</span>
-                    </h3>
-                    
-                    <div class="space-y-2 relative z-10">
-                        <div class="flex justify-between items-center border-b border-brand-100/50 pb-2">
-                            <span class="text-xs text-slate-500">ตำบล / แขวง</span>
-                            <span id="addr-suburb" class="text-xs font-bold text-slate-800 text-right">-</span>
-                        </div>
-                        <div class="flex justify-between items-center border-b border-brand-100/50 pb-2">
-                            <span class="text-xs text-slate-500">อำเภอ / เขต</span>
-                            <span id="addr-district" class="text-xs font-bold text-slate-800 text-right">-</span>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs text-slate-500">จังหวัด</span>
-                            <span id="addr-province" class="text-xs font-bold text-slate-800 text-right">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- โซน 3: แผงควบคุมและส่งออกข้อมูล (KML Export Area) -->
-                <div class="space-y-3">
-                    <!-- ปุ่มส่งออก KML ตัวเอกหลัก -->
-                    <button id="btn-export-kml" class="w-full flex items-center justify-center space-x-2.5 p-4 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-700 hover:to-brand-800 text-white font-semibold text-sm transition-all shadow-glow duration-300 transform hover:-translate-y-0.5 active:translate-y-0">
-                        <!-- SVG: Download icon -->
-                        <svg class="w-5 h-5 text-white animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                        </svg>
-                        <span>ดาวน์โหลดเส้นทางเป็นไฟล์ KML</span>
-                    </button>
-
-                    <!-- การควบคุมระบบติดตาม -->
-                    <div class="grid grid-cols-2 gap-2">
-                        <!-- ปุ่มเริ่ม/หยุด GPS -->
-                        <button id="btn-toggle-tracking" class="flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 font-semibold text-xs transition-all hover:bg-rose-100">
-                            <span id="tracking-status-dot" class="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
-                            <span id="tracking-status-text">หยุดติดตามชั่วคราว</span>
+                    <div class="flex items-end space-x-2">
+                        <button id="btn-save-keys" class="flex-1 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-lg shadow-md transition">
+                            <i class="fa-solid fa-floppy-disk mr-1"></i> บันทึกคีย์และรีโหลดแผนที่
                         </button>
+                    </div>
+                </div>
+                <!-- Device Simulation Tools -->
+                <div class="mt-4 p-3 bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                    <h4 class="text-xs font-bold text-amber-600 dark:text-amber-400 flex items-center mb-2">
+                        <i class="fa-solid fa-gamepad mr-2"></i> แผงจำลองการเคลื่อนที่ของอุปกรณ์ (Device GPS Simulator)
+                    </h4>
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                        เนื่องจากนี่เป็น SPA บนเบราว์เซอร์ คุณสามารถจำลองให้อุปกรณ์วิ่งห่างออกจากบ้านเพื่อทดสอบแผนที่, Reverse Geocoding, สภาพอากาศ, และความเร็วแบบเรียลไทม์ได้ที่นี่
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <button id="sim-start" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded-lg transition">
+                            <i class="fa-solid fa-play mr-1"></i> เริ่มต้นเคลื่อนที่ (จำลองเส้นทางทริป)
+                        </button>
+                        <button id="sim-stop" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded-lg transition">
+                            <i class="fa-solid fa-stop mr-1"></i> หยุดจำลอง
+                        </button>
+                        <button id="sim-reset" class="px-3 py-1.5 bg-slate-500 hover:bg-slate-600 text-white text-xs rounded-lg transition">
+                            <i class="fa-solid fa-arrow-rotate-left mr-1"></i> รีเซ็ตกลับบ้าน
+                        </button>
+                        <div class="flex items-center space-x-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 rounded-lg text-xs font-semibold">
+                            <span>ความเร็วจำลอง:</span>
+                            <span id="sim-speed-text" class="text-blue-600 dark:text-blue-400">0 km/h</span>
+                        </div>
+                    </div>
+                </div>
+            </details>
+        </section>
+
+
+        <!-- ==================== SECTION 2 & 3: MAPS & REALTIME DATA ==================== -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Panel (8 cols): Google Maps Tracker & Live Data -->
+            <div class="lg:col-span-8 flex flex-col space-y-6">
+                <!-- Map Card -->
+                <div class="glass-card rounded-2xl overflow-hidden flex flex-col shadow-glass-light dark:shadow-glass-dark">
+                    <!-- Map Header Controls -->
+                    <div class="p-4 bg-slate-100/50 dark:bg-slate-800/50 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800">
+                        <div class="flex items-center space-x-2">
+                            <span class="flex h-3 w-3 relative">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+                            </span>
+                            <h3 class="font-bold text-sm">การติดตามอุปกรณ์แบบ Real-time (Google Maps)</h3>
+                        </div>
                         
-                        <!-- ปุ่มลบประวัติเส้นทาง -->
-                        <button id="btn-clearhistory" class="flex items-center justify-center space-x-1.5 py-3 px-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs transition-all font-semibold">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-11v0a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                            <span>ล้างประวัติแผนที่</span>
-                        </button>
+                        <div class="flex items-center space-x-2">
+                            <!-- Lock Center Toggle -->
+                            <button id="btn-lock-center" class="px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 text-xs font-semibold rounded-lg flex items-center transition shadow-sm">
+                                <i class="fa-solid fa-location-crosshairs mr-1"></i>
+                                <span id="lock-center-text">ล็อกกึ่งกลาง (เปิด)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Map Render Canvas -->
+                    <div id="map-container" class="relative bg-slate-300 dark:bg-slate-800 flex items-center justify-center">
+                        <!-- Loading Indicator or Map placeholder if no script loaded -->
+                        <div id="map-placeholder" class="text-center p-6 text-slate-500 dark:text-slate-400 absolute z-10 pointer-events-none">
+                            <i class="fa-solid fa-map-location-dot text-4xl mb-2 animate-bounce"></i>
+                            <p class="text-sm font-semibold">กำลังเชื่อมต่อ Google Maps API...</p>
+                            <p class="text-xs text-slate-400 mt-1">หากแผนที่ไม่ทำงาน ให้กดเปิดแท็บ "ตั้งค่า API Keys" เพื่อใส่คีย์ของคุณ</p>
+                        </div>
+                        <div id="map-canvas" class="w-full h-full"></div>
+                    </div>
+
+                    <!-- Device Info Footer -->
+                    <div class="p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 bg-slate-100/30 dark:bg-slate-800/30 text-xs border-t border-slate-200 dark:border-slate-800">
+                        <div>
+                            <span class="text-slate-400 block mb-0.5">พิกัดอุปกรณ์</span>
+                            <span id="txt-gps-coords" class="font-bold text-slate-700 dark:text-slate-300">-- , --</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block mb-0.5">ความเร็ว / ทิศทาง</span>
+                            <span id="txt-gps-speed-dir" class="font-bold text-slate-700 dark:text-slate-300">0 km/h | เหนือ (0°)</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block mb-0.5">ระยะทางจากบ้าน (15.72, 102.29)</span>
+                            <span id="txt-distance-val" class="font-bold text-blue-600 dark:text-blue-400">0.00 km</span>
+                        </div>
+                        <div>
+                            <span class="text-slate-400 block mb-0.5">อัปเดตล่าสุด</span>
+                            <span id="txt-gps-time" class="font-bold text-slate-700 dark:text-slate-300">--:--:--</span>
+                        </div>
+                    </div>
+
+                    <!-- Reverse Geocode Info -->
+                    <div class="px-4 py-3 bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-t border-slate-200 dark:border-slate-800 text-xs">
+                        <p class="text-slate-500 dark:text-slate-400 font-semibold mb-1 flex items-center">
+                            <i class="fa-solid fa-map-pin text-rose-500 mr-2"></i> ที่อยู่พิกัดปัจจุบัน (Reverse Geocoding):
+                        </p>
+                        <p id="txt-address" class="text-slate-800 dark:text-slate-200 font-bold leading-relaxed">กำลังดึงข้อมูลที่อยู่...</p>
                     </div>
                 </div>
             </div>
 
-            <!-- ข้อมูลทางเทคนิคเชิงลึกส่วนท้าย -->
-            <div class="px-5 py-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                <span id="sys-accuracy">ความแม่นยำสูงสุด: -</span>
-                <span class="flex items-center space-x-1">
-                    <span class="inline-block w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-                    <span>HTTPS Secure</span>
-                </span>
+            <!-- Right Panel (4 cols): Fuel and Weather Info -->
+            <div class="lg:col-span-4 flex flex-col space-y-6">
+                <!-- Weather Status Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark flex flex-col justify-between h-[260px] bg-gradient-to-br from-blue-400/10 to-indigo-500/10">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">สภาพอากาศจุดอุปกรณ์</span>
+                            <h3 id="weather-location" class="text-xl font-bold mt-1 text-slate-800 dark:text-white">กรุงเทพมหานคร</h3>
+                            <p id="weather-description" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">หมอกจางๆ และมีแดด</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-4xl font-bold tracking-tight text-slate-800 dark:text-white" id="weather-temp">--°C</div>
+                            <p class="text-[10px] text-slate-500 dark:text-slate-400" id="weather-feels">รู้สึกเหมือน: --°C</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 py-4 border-t border-b border-slate-200/50 dark:border-slate-700/50 text-xs">
+                        <div class="text-center">
+                            <span class="text-slate-400 block text-[10px]"><i class="fa-solid fa-droplet text-blue-400 mr-1"></i> ความชื้น</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300" id="weather-humidity">--%</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-slate-400 block text-[10px]"><i class="fa-solid fa-wind text-indigo-400 mr-1"></i> ลม</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300" id="weather-wind">-- m/s</span>
+                        </div>
+                        <div class="text-center">
+                            <span class="text-slate-400 block text-[10px]"><i class="fa-solid fa-sun text-amber-500 mr-1"></i> UV Index</span>
+                            <span class="font-bold text-slate-700 dark:text-slate-300" id="weather-uv">--</span>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center text-[10px] text-slate-400">
+                        <span><i class="fa-solid fa-cloud-sun mr-1"></i> เมฆ: <span id="weather-clouds">--%</span> | ทัศนวิสัย: <span id="weather-visibility">-- km</span></span>
+                        <span id="weather-update-time">อัปเดต: --:--:--</span>
+                    </div>
+                </div>
+
+                <!-- Live Oil Prices Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark flex flex-col justify-between min-h-[300px]">
+                    <div>
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-bold text-sm flex items-center">
+                                <i class="fa-solid fa-gas-pump text-amber-500 mr-2"></i> ราคาน้ำมันขายปลีกวันนี้
+                            </h3>
+                            <button id="btn-refresh-oil" class="p-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs" title="อัปเดตราคาน้ำมัน">
+                                <i class="fa-solid fa-arrows-rotate"></i>
+                            </button>
+                        </div>
+
+                        <!-- Brand Tabs Selection -->
+                        <div class="flex space-x-1.5 mb-3 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl" id="oil-brand-tabs">
+                            <!-- Tabs added dynamically by JS -->
+                        </div>
+
+                        <!-- Prices List -->
+                        <div class="space-y-2 max-h-[180px] overflow-y-auto pr-1" id="oil-prices-list">
+                            <!-- Prices dynamically loaded -->
+                        </div>
+                    </div>
+
+                    <div class="border-t border-slate-200 dark:border-slate-800 pt-3 mt-3 flex justify-between items-center text-[10px] text-slate-400">
+                        <div class="flex items-center">
+                            <img id="oil-brand-logo" src="" class="h-4 mr-2 object-contain hidden" alt="Brand Logo">
+                            <span id="oil-brand-name" class="font-bold">--</span>
+                        </div>
+                        <span id="oil-update-time">อัปเดตล่าสุด: --:--</span>
+                    </div>
+                </div>
             </div>
-        </div>
+        </section>
 
-        <!-- ปุ่มสำหรับซ่อน/แสดงแผงควบคุมบนมือถือเพื่อเพิ่มพื้นที่จอกว้าง -->
-        <button id="btn-minimize" class="mt-3 mx-auto md:mx-0 w-28 bg-slate-900/90 text-white font-semibold text-[11px] uppercase tracking-wider py-2 px-3 rounded-full shadow-premium flex items-center justify-center space-x-1.5 border border-white/10 backdrop-blur-sm transition-all duration-300 hover:bg-slate-950 active:scale-95">
-            <span id="minimize-text">ซ่อนแผงควบคุม</span>
-            <svg id="minimize-icon" class="w-3.5 h-3.5 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"></path></svg>
-        </button>
-    </div>
 
-    <!-- ส่วนที่ 2: ปุ่มลอยสำหรับการล็อกตำแหน่งและการควบคุมแผนที่เชิงลึก (Quick Actions Floating Panel) -->
-    <div class="absolute bottom-6 right-6 z-[1000] flex flex-col space-y-3">
-        <!-- ปุ่มสลับ Layer แผนที่ (ปกติ / ดาวเทียม Google Satellite Hybrid) -->
-        <button id="btn-toggle-layer" class="w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-700 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90" title="สลับแผนที่ดาวเทียม / แผนที่ปกติ">
-            <!-- Icon: Layers / Maps -->
-            <svg class="w-6 h-6 text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
-            </svg>
-        </button>
+        <!-- ==================== SECTION 1: TRIP FINANCES SYSTEM ==================== -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <!-- Left Panel (4 cols): Budget Control & Transaction Add -->
+            <div class="lg:col-span-4 flex flex-col space-y-6">
+                <!-- Initial Budget Control Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center mb-4">
+                        <i class="fa-solid fa-coins text-amber-500 mr-2"></i> จัดการงบประมาณตั้งต้นของทริป
+                    </h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-slate-500 dark:text-slate-400 mb-1">งบประมาณเริ่มต้น (บาท)</label>
+                            <div class="flex space-x-2">
+                                <input id="inp-init-budget" type="number" value="10000" class="flex-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-2 text-sm font-bold text-slate-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                <button id="btn-save-budget" class="px-4 py-2 bg-gradient-to-tr from-emerald-600 to-teal-500 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-lg transition">
+                                    บันทึกงบ
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-3 bg-blue-500/5 dark:bg-blue-500/10 rounded-xl text-xs space-y-1 border border-blue-500/10">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">เงินตั้งต้น:</span>
+                                <span class="font-bold" id="lbl-init-budget">10,000.00 ฿</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">รายรับรวมระหว่างทริป:</span>
+                                <span class="font-bold text-emerald-600 dark:text-emerald-400" id="lbl-total-income">+0.00 ฿</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">รายจ่ายรวม:</span>
+                                <span class="font-bold text-rose-600 dark:text-rose-400" id="lbl-total-expense">-0.00 ฿</span>
+                            </div>
+                            <div class="h-[1px] bg-slate-200 dark:bg-slate-700 my-2"></div>
+                            <div class="flex justify-between text-sm">
+                                <span class="font-bold text-slate-600 dark:text-slate-300">คงเหลือสุทธิ:</span>
+                                <span class="font-extrabold text-blue-600 dark:text-blue-400" id="lbl-net-balance">10,000.00 ฿</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <!-- ปุ่มสลับ Auto-Center ล็อกตำแหน่งผู้ใช้ตรงกลางกล้องเสมอ -->
-        <button id="btn-autocenter" class="w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-brand-600 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90" title="ล็อกตำแหน่งให้อยู่ตรงกลาง">
-            <svg id="autocenter-icon" class="w-6 h-6 animate-spin-slow text-brand-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
-            </svg>
-        </button>
+                <!-- Transaction Form Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark">
+                    <div class="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                        <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center">
+                            <i class="fa-solid fa-file-invoice-dollar text-blue-500 mr-2"></i>
+                            <span id="form-title">บันทึกรายการบัญชีใหม่</span>
+                        </h3>
+                        <button id="btn-reset-form" class="hidden text-xs text-rose-500 hover:underline">ยกเลิกแก้ไข</button>
+                    </div>
 
-        <!-- กลุ่มควบคุมระดับซูมแบบพรีเมียม -->
-        <div class="flex flex-col bg-white/90 backdrop-blur-md rounded-2xl shadow-premium border border-white/40 overflow-hidden">
-            <button id="btn-zoom-in" class="w-12 h-12 hover:bg-slate-50 text-slate-800 flex items-center justify-center font-bold text-xl transition-all border-b border-slate-100 active:scale-90">+</button>
-            <button id="btn-zoom-out" class="w-12 h-12 hover:bg-slate-50 text-slate-800 flex items-center justify-center font-bold text-xl transition-all active:scale-90">−</button>
-        </div>
-    </div>
+                    <!-- Toggle Form Type -->
+                    <div class="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4">
+                        <button id="tab-add-expense" class="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition">
+                            <i class="fa-solid fa-arrow-trend-down text-rose-500 mr-1"></i> รายจ่าย
+                        </button>
+                        <button id="tab-add-income" class="flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition">
+                            <i class="fa-solid fa-arrow-trend-up text-emerald-500 mr-1"></i> รายรับ
+                        </button>
+                    </div>
 
-    <!-- แผงแจ้งเตือนแบบลอยล้ำสมัย (Premium Toast Alert) -->
-    <div id="warning-toast" class="hidden absolute top-6 left-1/2 -translate-x-1/2 z-[2000] bg-red-500/95 backdrop-blur-md text-white font-medium text-xs px-5 py-3.5 rounded-2xl shadow-premium flex items-center space-x-3 transition-all duration-300 border border-red-400/20 max-w-sm">
-        <svg class="w-5 h-5 flex-shrink-0 text-white animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        <span id="warning-text">ความเชื่อมโยงกับเซ็นเซอร์ตำแหน่งขัดข้อง</span>
-        <button onclick="closeWarning()" class="text-white hover:text-red-200 focus:outline-none font-bold text-sm ml-3">✕</button>
-    </div>
+                    <form id="frm-transaction" class="space-y-3">
+                        <input type="hidden" id="tx-id">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-[11px] text-slate-500 mb-1">วันที่</label>
+                                <input id="tx-date" type="date" required class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-500 mb-1">เวลา</label>
+                                <input id="tx-time" type="time" required class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
 
-    <!-- Leaflet Map JS CDN -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">รายการบัญชี</label>
+                            <input id="tx-title" type="text" placeholder="เช่น ค่าข้าวเที่ยงริมหาด" required class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                        </div>
 
+                        <div class="grid grid-cols-2 gap-3">
+                            <div id="wrapper-category">
+                                <label class="block text-[11px] text-slate-500 mb-1">หมวดหมู่</label>
+                                <select id="tx-category" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <option value="ค่าน้ำมัน">ค่าน้ำมัน</option>
+                                    <option value="ค่าอาหาร">ค่าอาหาร</option>
+                                    <option value="ค่าที่พัก">ค่าที่พัก</option>
+                                    <option value="ค่าเดินทาง">ค่าเดินทาง</option>
+                                    <option value="ค่าทางด่วน">ค่าทางด่วน</option>
+                                    <option value="ค่าเครื่องดื่ม">ค่าเครื่องดื่ม</option>
+                                    <option value="ค่าของฝาก">ค่าของฝาก</option>
+                                    <option value="อื่นๆ">อื่นๆ</option>
+                                </select>
+                            </div>
+                            <div id="wrapper-income-type" class="hidden">
+                                <label class="block text-[11px] text-slate-500 mb-1">ประเภทรายรับ</label>
+                                <select id="tx-income-type" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-2 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                                    <option value="คนร่วมทริปโอนเงิน">คนร่วมทริปโอนเงิน</option>
+                                    <option value="เงินคืน">เงินคืน</option>
+                                    <option value="รายได้อื่นๆ">รายได้อื่นๆ</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] text-slate-500 mb-1">จำนวนเงิน (บาท)</label>
+                                <input id="tx-amount" type="number" step="0.01" min="0.01" required placeholder="0.00" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-slate-500 mb-1">หมายเหตุ (ถ้ามี)</label>
+                            <input id="tx-note" type="text" placeholder="เช่น ร้านส้มตำป้าศรี" class="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <button type="submit" class="w-full py-2.5 bg-gradient-to-tr from-blue-600 to-indigo-500 text-white font-semibold text-xs rounded-xl shadow-md hover:shadow-lg transition">
+                            <i class="fa-solid fa-plus mr-1"></i> <span id="btn-submit-text">เพิ่มรายการธุรกรรม</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Panel (8 cols): Data Analysis Graphs & Table View -->
+            <div class="lg:col-span-8 flex flex-col space-y-6">
+                
+                <!-- Financial Analysis Graphs Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark">
+                    <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center mb-4">
+                        <i class="fa-solid fa-chart-pie text-blue-500 mr-2"></i> สรุปสัดส่วนรายจ่ายของทริป (Visual Analysis)
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                        <!-- Chart 1: Expense breakdown by category (Pie Chart) -->
+                        <div class="relative flex flex-col items-center">
+                            <span class="text-xs font-semibold text-slate-500 mb-2">สัดส่วนหมวดหมู่รายจ่าย (%)</span>
+                            <div class="w-full max-w-[200px] h-[200px] flex items-center justify-center">
+                                <canvas id="chart-expenses-pie"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: Cumulative Expense comparison (Bar Chart) -->
+                        <div class="relative flex flex-col items-center">
+                            <span class="text-xs font-semibold text-slate-500 mb-2">มูลค่ารวมแต่ละหมวดหมู่ (บาท)</span>
+                            <div class="w-full max-w-[320px] h-[200px] flex items-center justify-center">
+                                <canvas id="chart-expenses-bar"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ledger Database Table Card -->
+                <div class="glass-card p-5 rounded-2xl shadow-glass-light dark:shadow-glass-dark flex flex-col">
+                    <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
+                        <h3 class="font-bold text-sm text-slate-800 dark:text-white flex items-center">
+                            <i class="fa-solid fa-list-check text-indigo-500 mr-2"></i> บัญชีและรายการทั้งหมดของทริป
+                        </h3>
+                        
+                        <!-- Actions & Backups -->
+                        <div class="flex flex-wrap gap-2">
+                            <button id="btn-export-json" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[11px] font-semibold rounded-lg text-slate-700 dark:text-slate-300 transition">
+                                <i class="fa-solid fa-file-code text-blue-500 mr-1"></i> Export JSON
+                            </button>
+                            <button id="btn-export-csv" class="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[11px] font-semibold rounded-lg text-slate-700 dark:text-slate-300 transition">
+                                <i class="fa-solid fa-file-csv text-emerald-500 mr-1"></i> Export CSV
+                            </button>
+                            <label class="cursor-pointer px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[11px] font-semibold rounded-lg text-slate-700 dark:text-slate-300 transition">
+                                <i class="fa-solid fa-file-import text-amber-500 mr-1"></i> Import JSON
+                                <input type="file" id="btn-import-json" class="hidden" accept=".json">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Search & Filter Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 py-4 border-b border-slate-200 dark:border-slate-800 text-xs">
+                        <!-- Search text -->
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400"></i>
+                            <input id="tbl-search" type="text" placeholder="ค้นหารายการ..." class="w-full pl-8 pr-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        
+                        <!-- Filter type -->
+                        <div>
+                            <select id="tbl-filter-type" class="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="all">ทุกประเภท (รายรับ/รายจ่าย)</option>
+                                <option value="expense">เฉพาะรายจ่าย</option>
+                                <option value="income">เฉพาะรายรับ</option>
+                            </select>
+                        </div>
+
+                        <!-- Filter category -->
+                        <div>
+                            <select id="tbl-filter-category" class="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="all">ทุกหมวดหมู่</option>
+                                <!-- Categories are loaded via Javascript -->
+                            </select>
+                        </div>
+
+                        <!-- Date filter -->
+                        <div>
+                            <input id="tbl-filter-date" type="date" class="w-full px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border-none rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <!-- Database Ledger Table View -->
+                    <div class="overflow-x-auto mt-4 max-h-[300px]">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="border-b border-slate-200 dark:border-slate-800 text-slate-400 font-semibold bg-slate-100/50 dark:bg-slate-800/50">
+                                    <th class="p-3 cursor-pointer select-none" id="col-sort-date">
+                                        วัน-เวลา <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="p-3">รายการ / โน้ต</th>
+                                    <th class="p-3">หมวดหมู่</th>
+                                    <th class="p-3 text-right cursor-pointer select-none" id="col-sort-amount">
+                                        จำนวนเงิน <i class="fa-solid fa-sort ml-1"></i>
+                                    </th>
+                                    <th class="p-3 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbl-ledger-body" class="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                <!-- Table Rows generated dynamically by JS -->
+                            </tbody>
+                        </table>
+                        <!-- Empty Data Alert -->
+                        <div id="tbl-empty-state" class="hidden text-center py-12 text-slate-400">
+                            <i class="fa-solid fa-folder-open text-4xl mb-2"></i>
+                            <p class="text-xs">ไม่พบข้อมูลการบันทึกทริป</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Notification Center -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- SYSTEM CONFIG & SCRIPTS -->
     <script>
-        // ==========================================
-        // 1. กำหนดตัวแปรหลักสำหรับการทำงานของแอปพลิเคชัน
-        // ==========================================
-        let map;
-        let userMarker = null;       // หมุดที่ระบุพิกัดปัจจุบันของผู้ใช้
-        let accuracyCircle = null;   // วงกลมบอกระดับรัศมีจำกัดความแม่นยำของ GPS
-        let watchId = null;          // ตัวชี้คอยติดตามพิกัดใน watchPosition
-        let autoCenter = true;       // ล็อกมุมกล้องของแผนที่ไว้ตรงกลางตำแหน่งล่าสุดเสมอ
-        let isTrackingActive = true; // Status สำหรับหยุด/เริ่มติดตาม GPS
-        let pathHistory = [];        // จัดเก็บอาร์เรย์ของจุดพิกัดเพื่อวาดเส้นและส่งออก KML
-        let routePolyline = null;    // Object ของเส้นทางบนแผนที่ Leaflet
-        let totalDistance = 0;       // ระยะทางการเดินทางสะสมเชิงพิกัด (เมตร)
-        let lastGeocodeTime = 0;     // เวลาการสืบค้นชื่อที่อยู่ล่าสุด (ประหยัดพลังงานยิง API)
-        let lastFetchedCoords = { lat: 0, lon: 0 }; // พิกัดสำหรับตรวจสอบการเคลื่อนตัวขั้นต่ำ
+        // =========================================================================
+        // 1. API CONFIGURATION & KEYS FOR EXTERNAL SERVICES
+        // =========================================================================
+        // คุณสามารถใส่คีย์ API ลงในตัวแปรเหล่านี้เพื่อใช้งานฟังก์ชันจริงได้อย่างสมบูรณ์
+        // หรือตั้งค่าผ่านหน้า UI ในส่วน "ตั้งค่า API Keys"
+        const APP_CONFIG = {
+            googleMapsKey: "", // Google Maps API Key
+            openWeatherKey: "", // OpenWeatherMap API Key
+            homeCoords: { lat: 15.729762, lng: 102.294181 }, // บ้าน
+            updateWeatherInterval: 10 * 60 * 1000, // สภาพอากาศอัปเดตทุก 10 นาที (มิลลิวินาที)
+        };
 
-        // กำหนดพิกัดจุดบ้านถาวร (พิกัดตามที่คุณกำหนด : 15.729789, 102.294175)
-        const HOME_LAT = 15.729789;
-        const HOME_LON = 102.294175;
-        let homeMarker = null;       // เก็บ Object หมุดบ้าน
+        // =========================================================================
+        // 2. STATE MANAGEMENT (สถานะของแอปพลิเคชัน)
+        // =========================================================================
+        let dbState = {
+            initialBudget: 10000.00,
+            transactions: [], // { id, type: 'income'|'expense', date, time, title, category, amount, note }
+            deviceGPS: {
+                lat: 15.729762,
+                lng: 102.294181,
+                speed: 0,
+                heading: 0,
+                timestamp: new Date().toISOString()
+            },
+            isLockCenter: true,
+            sortField: 'date',
+            sortAscending: false,
+        };
 
-        // เลเยอร์แผนที่ (Map Layers)
-        let osmLayer;                // แผนที่ถนนปกติ OpenStreetMap
-        let googleSatelliteLayer;    // แผนที่ภาพถ่ายดาวเทียมแบบไฮบริด (Google Satellite Hybrid)
-        let currentLayerType = 'osm'; // ประเภทเลเยอร์ที่กำลังใช้งานขณะนั้น ('osm' หรือ 'satellite')
+        // ตัวแปรเก็บอ้างอิงของวัตถุภายนอก (Google Maps & ChartJS)
+        let gMap = null;
+        let gMarker = null;
+        let gHomeMarker = null;
+        let chartPie = null;
+        let chartBar = null;
+        let isSimulationRunning = false;
+        let simIntervalId = null;
+        let simStep = 0;
 
-        // ==========================================
-        // 2. การเริ่มระบบทั้งหมดเมื่อพร้อม (Application Initializations)
-        // ==========================================
+        // =========================================================================
+        // 3. INITIALIZATION & LOCALSTORAGE LOADER
+        // =========================================================================
         window.addEventListener('DOMContentLoaded', () => {
-            initMap();
-            startTracking();
-            setupInteractiveEvents();
+            loadSavedKeysAndSettings();
+            initTheme();
+            loadTripLedger();
+            initBudgetSystem();
+            renderLedgerTable();
+            initSimulationControls();
+            
+            // ดึงราคาน้ำมัน (Mock / API)
+            fetchOilPrices();
+            
+            // เริ่มต้น Google Maps
+            injectGoogleMapsScript();
+
+            // รันเวลาปัจจุบันบน Header
+            setInterval(() => {
+                document.getElementById('header-clock').textContent = new Date().toLocaleTimeString('th-TH');
+            }, 1000);
+
+            // ดึงสภาพอากาศครั้งแรก และตั้งเวลาอัปเดตทุก 10 นาที
+            fetchWeatherConditions();
+            setInterval(fetchWeatherConditions, APP_CONFIG.updateWeatherInterval);
         });
 
-        // กำหนดรายละเอียดพื้นฐานและการเชื่อมโยงแผนที่
-        function initMap() {
-            // สร้างแผนที่และระบุจุดพิกัดกึ่งกลางเริ่มต้นไว้ที่พิกัดบ้าน
-            map = L.map('map', {
-                zoomControl: false,
-                attributionControl: true
-            }).setView([HOME_LAT, HOME_LON], 13);
+        // ดึง Keys ที่ผู้ใช้อาจจะเซฟไว้ในเบราว์เซอร์
+        function loadSavedKeysAndSettings() {
+            const savedGKey = localStorage.getItem('cfg_google_key');
+            const savedWKey = localStorage.getItem('cfg_weather_key');
+            if (savedGKey) {
+                APP_CONFIG.googleMapsKey = savedGKey;
+                document.getElementById('key-google-maps').value = savedGKey;
+            }
+            if (savedWKey) {
+                APP_CONFIG.openWeatherKey = savedWKey;
+                document.getElementById('key-weather').value = savedWKey;
+            }
 
-            // 2.1 กำหนดเลเยอร์แผนที่ถนนมาตรฐาน (OpenStreetMap)
-            osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            });
-
-            // 2.2 กำหนดเลเยอร์ภาพถ่ายดาวเทียมไฮบริด (Google Hybrid Map: s = satellite, y = hybrid)
-            googleSatelliteLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
-                maxZoom: 20,
-                subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
-                attribution: '&copy; Google Maps'
-            });
-
-            // เพิ่มเลเยอร์ OpenStreetMap เป็นค่าเริ่มต้น
-            osmLayer.addTo(map);
-
-            // ปักหมุดพิกัดจุดบ้านถาวร ด้วยไอคอนสไตล์พรีเมียมสี Indigo และกล่องข้อความป๊อปอัพ
-            const homeIcon = L.divIcon({
-                className: 'custom-home-marker',
-                html: `<div class="w-9 h-9 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-indigo-glow border-2 border-white transition-all transform hover:scale-110">
-                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                         </svg>
-                       </div>`,
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
-            });
-
-            homeMarker = L.marker([HOME_LAT, HOME_LON], { icon: homeIcon }).addTo(map);
-            homeMarker.bindPopup(`
-                <div class="p-1">
-                    <span class="text-indigo-600 font-bold block text-sm">🏡 บ้านของฉัน (Home Base)</span>
-                    <span class="text-[11px] text-slate-500 font-numbers block mt-1">LAT: ${HOME_LAT}<br>LON: ${HOME_LON}</span>
-                </div>
-            `);
-
-            // สร้างเลเยอร์เส้นทางที่จะระบุบนแผนที่
-            routePolyline = L.polyline([], {
-                color: '#2563eb',     // สีน้ำเงินหลัก
-                weight: 6,            // ความหนาเส้น
-                opacity: 0.85,         // ความโปร่งแสง
-                lineJoin: 'round',
-                lineCap: 'round'
-            }).addTo(map);
-
-            // เมื่อผู้ใช้สัมผัสหรือลากเลื่อนแผนที่ด้วยตัวเอง จะปิด Auto-Center อัตโนมัติทันที
-            map.on('dragstart', () => {
-                setAutoCenter(false);
+            // บันทึก Keys คอนโทรล
+            document.getElementById('btn-save-keys').addEventListener('click', () => {
+                const gKey = document.getElementById('key-google-maps').value.trim();
+                const wKey = document.getElementById('key-weather').value.trim();
+                localStorage.setItem('cfg_google_key', gKey);
+                localStorage.setItem('cfg_weather_key', wKey);
+                APP_CONFIG.googleMapsKey = gKey;
+                APP_CONFIG.openWeatherKey = wKey;
+                showNotification('บันทึกคีย์เรียบร้อยแล้ว กำลังทำรายการรีโหลด', 'success');
+                setTimeout(() => location.reload(), 1500);
             });
         }
 
-        // ==========================================
-        // 3. ระบบติดตามพิกัด Geolocation API Logic
-        // ==========================================
-        function startTracking() {
-            if (!isTrackingActive) return;
+        // =========================================================================
+        // 4. THEME CONTROL (LIGHT/DARK MODE)
+        // =========================================================================
+        function initTheme() {
+            const themeBtn = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const htmlElement = document.documentElement;
 
-            if (!("geolocation" in navigator)) {
-                showWarning("เบราว์เซอร์นี้ไม่รองรับระบบประมวลผลตำแหน่ง Geolocation");
-                updateSystemStatus('error', 'ไม่รองรับระบบ GPS');
-                return;
+            // ตรวจสอบค่าเริ่มต้น
+            const savedTheme = localStorage.getItem('app-theme') || 'light';
+            if (savedTheme === 'dark') {
+                htmlElement.classList.add('dark');
+                themeIcon.className = 'fa-solid fa-sun';
+            } else {
+                htmlElement.classList.remove('dark');
+                themeIcon.className = 'fa-solid fa-moon';
             }
 
-            const geoOptions = {
-                enableHighAccuracy: true,  // ร้องขอความแม่นยำสูงสุดจากชิป GPS ของอุปกรณ์
-                timeout: 12000,            // ระยะเวลาประมวลผลตำแหน่งไม่เกิน 12 วินาที
-                maximumAge: 0              // ไม่ดึงพิกัดจากแคชเก่า บังคับหาพิกัดจริงเรียลไทม์
+            themeBtn.addEventListener('click', () => {
+                if (htmlElement.classList.contains('dark')) {
+                    htmlElement.classList.remove('dark');
+                    themeIcon.className = 'fa-solid fa-moon';
+                    localStorage.setItem('app-theme', 'light');
+                } else {
+                    htmlElement.classList.add('dark');
+                    themeIcon.className = 'fa-solid fa-sun';
+                    localStorage.setItem('app-theme', 'dark');
+                }
+            });
+        }
+
+        // =========================================================================
+        // 5. TRIP FINANCE MODULE (ส่วนที่ 1: ระบบจัดการการเงินทริป)
+        // =========================================================================
+        
+        function loadTripLedger() {
+            const savedBudget = localStorage.getItem('trip_initial_budget');
+            if (savedBudget) {
+                dbState.initialBudget = parseFloat(savedBudget);
+                document.getElementById('inp-init-budget').value = dbState.initialBudget;
+            }
+            
+            const savedTransactions = localStorage.getItem('trip_transactions');
+            if (savedTransactions) {
+                dbState.transactions = JSON.parse(savedTransactions);
+            } else {
+                // ตัวอย่างข้อมูลเริ่มต้น (Mock Transactions)
+                dbState.transactions = [
+                    { id: "1", type: 'expense', date: '2026-07-01', time: '08:30', title: 'เติมน้ำมันเต็มถัง', category: 'ค่าน้ำมัน', amount: 1200, note: 'ปั๊ม ปตท. ทางด่วน' },
+                    { id: "2", type: 'expense', date: '2026-07-01', time: '12:15', title: 'อาหารเที่ยงซีฟู้ด', category: 'ค่าอาหาร', amount: 1550, note: 'ครัวริมหาดพัทยา' },
+                    { id: "3", type: 'income', date: '2026-07-02', time: '10:00', title: 'โอ๊ตโอนเงินกองกลาง', category: 'คนร่วมทริปโอนเงิน', amount: 2500, note: 'ทริปพัทยา' },
+                    { id: "4", type: 'expense', date: '2026-07-02', time: '14:00', title: 'กาแฟและเครื่องดื่มคาเฟ่', category: 'ค่าเครื่องดื่ม', amount: 320, note: 'The Glass House' },
+                    { id: "5", type: 'expense', date: '2026-07-02', time: '18:00', title: 'โรงแรมที่พักคืนแรก', category: 'ค่าที่พัก', amount: 2800, note: 'Hilton Pattaya' }
+                ];
+                saveTripLedgerToLocal();
+            }
+        }
+
+        function saveTripLedgerToLocal() {
+            localStorage.setItem('trip_initial_budget', dbState.initialBudget.toString());
+            localStorage.setItem('trip_transactions', JSON.stringify(dbState.transactions));
+        }
+
+        function initBudgetSystem() {
+            // ปุ่มเซฟเงินตั้งต้น
+            document.getElementById('btn-save-budget').addEventListener('click', () => {
+                const val = parseFloat(document.getElementById('inp-init-budget').value);
+                if (isNaN(val) || val < 0) {
+                    showNotification('กรุณากรอกงบประมาณเริ่มต้นให้ถูกต้อง', 'warning');
+                    return;
+                }
+                dbState.initialBudget = val;
+                saveTripLedgerToLocal();
+                recalculateBudget();
+                showNotification('บันทึกงบประมาณตั้งต้นเรียบร้อยแล้ว', 'success');
+            });
+
+            // ตรวจจับฟอร์มเพิ่ม/แก้ไขรายการ
+            const frm = document.getElementById('frm-transaction');
+            const tabExpense = document.getElementById('tab-add-expense');
+            const tabIncome = document.getElementById('tab-add-income');
+            let currentType = 'expense';
+
+            // ตั้งค่าวันที่และเวลาปัจจุบันในฟอร์มเป็น Default
+            const now = new Date();
+            document.getElementById('tx-date').value = now.toISOString().split('T')[0];
+            document.getElementById('tx-time').value = now.toTimeString().slice(0, 5);
+
+            tabExpense.addEventListener('click', () => {
+                currentType = 'expense';
+                tabExpense.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition";
+                tabIncome.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition";
+                document.getElementById('wrapper-category').classList.remove('hidden');
+                document.getElementById('wrapper-income-type').classList.add('hidden');
+            });
+
+            tabIncome.addEventListener('click', () => {
+                currentType = 'income';
+                tabIncome.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-white transition";
+                tabExpense.className = "flex-1 py-1.5 text-xs font-semibold rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition";
+                document.getElementById('wrapper-category').classList.add('hidden');
+                document.getElementById('wrapper-income-type').classList.remove('hidden');
+            });
+
+            frm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const txId = document.getElementById('tx-id').value;
+                const date = document.getElementById('tx-date').value;
+                const time = document.getElementById('tx-time').value;
+                const title = document.getElementById('tx-title').value.trim();
+                const amount = parseFloat(document.getElementById('tx-amount').value);
+                const note = document.getElementById('tx-note').value.trim();
+                let category = '';
+
+                if (currentType === 'expense') {
+                    category = document.getElementById('tx-category').value;
+                } else {
+                    category = document.getElementById('tx-income-type').value;
+                }
+
+                if (!title || isNaN(amount) || amount <= 0) {
+                    showNotification('กรุณากรอกข้อมูลรายการและยอดเงินให้ถูกต้อง', 'warning');
+                    return;
+                }
+
+                if (txId) {
+                    // โหมดแก้ไขรายการเดิม
+                    const idx = dbState.transactions.findIndex(t => t.id === txId);
+                    if (idx !== -1) {
+                        dbState.transactions[idx] = { id: txId, type: currentType, date, time, title, category, amount, note };
+                        showNotification('แก้ไขรายการเรียบร้อยแล้ว', 'success');
+                    }
+                } else {
+                    // โหมดเพิ่มรายการใหม่
+                    const newTx = {
+                        id: Date.now().toString(),
+                        type: currentType,
+                        date,
+                        time,
+                        title,
+                        category,
+                        amount,
+                        note
+                    };
+                    dbState.transactions.push(newTx);
+                    showNotification('บันทึกรายการใหม่เรียบร้อยแล้ว', 'success');
+                }
+
+                saveTripLedgerToLocal();
+                recalculateBudget();
+                renderLedgerTable();
+                resetForm();
+            });
+
+            // ปุ่มยกเลิกแก้ไข
+            document.getElementById('btn-reset-form').addEventListener('click', resetForm);
+
+            // ตัวกรอง (Filters) ในตาราง
+            document.getElementById('tbl-search').addEventListener('input', renderLedgerTable);
+            document.getElementById('tbl-filter-type').addEventListener('change', renderLedgerTable);
+            document.getElementById('tbl-filter-category').addEventListener('change', renderLedgerTable);
+            document.getElementById('tbl-filter-date').addEventListener('input', renderLedgerTable);
+
+            // การจัดการคลิกเรียงลำดับหัวตาราง (Sort)
+            document.getElementById('col-sort-date').addEventListener('click', () => toggleSort('date'));
+            document.getElementById('col-sort-amount').addEventListener('click', () => toggleSort('amount'));
+
+            // บัญชี Export & Backup Buttons
+            document.getElementById('btn-export-json').addEventListener('click', exportJSON);
+            document.getElementById('btn-export-csv').addEventListener('click', exportCSV);
+            document.getElementById('btn-import-json').addEventListener('change', importJSON);
+
+            recalculateBudget();
+        }
+
+        function resetForm() {
+            document.getElementById('frm-transaction').reset();
+            document.getElementById('tx-id').value = '';
+            document.getElementById('btn-submit-text').textContent = 'เพิ่มรายการธุรกรรม';
+            document.getElementById('form-title').textContent = 'บันทึกรายการบัญชีใหม่';
+            document.getElementById('btn-reset-form').classList.add('hidden');
+            
+            // คืนค่าวันที่/เวลาปัจจุบัน
+            const now = new Date();
+            document.getElementById('tx-date').value = now.toISOString().split('T')[0];
+            document.getElementById('tx-time').value = now.toTimeString().slice(0, 5);
+        }
+
+        // คำนวณรายรับ รายจ่าย ยอดคงเหลือ และรีเฟรชการแสดงผล UI
+        function recalculateBudget() {
+            let totalIncome = 0;
+            let totalExpense = 0;
+
+            dbState.transactions.forEach(tx => {
+                if (tx.type === 'income') {
+                    totalIncome += tx.amount;
+                } else if (tx.type === 'expense') {
+                    totalExpense += tx.amount;
+                }
+            });
+
+            const netBalance = dbState.initialBudget + totalIncome - totalExpense;
+
+            // อัปเดตข้อมูลในการ์ด Dashboard ด้านบนสุด
+            document.getElementById('dash-balance').textContent = netBalance.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ฿';
+            document.getElementById('dash-income').textContent = '+' + totalIncome.toLocaleString('th-TH') + ' ฿';
+            document.getElementById('dash-expense').textContent = '-' + totalExpense.toLocaleString('th-TH') + ' ฿';
+            document.getElementById('dash-budget-text').textContent = 'งบเริ่มต้น: ' + dbState.initialBudget.toLocaleString('th-TH') + ' ฿';
+
+            // ตกแต่งสีกรณีเงินใกล้หมดหรือติดลบ
+            const balanceCardText = document.getElementById('dash-balance');
+            if (netBalance < 0) {
+                balanceCardText.className = "text-lg md:text-xl font-bold text-rose-500 truncate animate-pulse";
+            } else if (netBalance < dbState.initialBudget * 0.15) {
+                balanceCardText.className = "text-lg md:text-xl font-bold text-amber-500 truncate";
+            } else {
+                balanceCardText.className = "text-lg md:text-xl font-bold text-slate-800 dark:text-white truncate";
+            }
+
+            // อัปเดตตารางตัวเลขสรุปในส่วนที่ 1
+            document.getElementById('lbl-init-budget').textContent = dbState.initialBudget.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + ' ฿';
+            document.getElementById('lbl-total-income').textContent = '+' + totalIncome.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + ' ฿';
+            document.getElementById('lbl-total-expense').textContent = '-' + totalExpense.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + ' ฿';
+            document.getElementById('lbl-net-balance').textContent = netBalance.toLocaleString('th-TH', { minimumFractionDigits: 2 }) + ' ฿';
+
+            // โหลด Category Filters ในตารางให้ถูกต้อง
+            updateCategoryFilters();
+
+            // เรนเดอร์กราฟ
+            renderCharts(totalExpense);
+        }
+
+        // โหลดรายการหมวดหมู่แบบ Dynamic เพื่อใช้เลือกกรองข้อมูล
+        function updateCategoryFilters() {
+            const selectFilter = document.getElementById('tbl-filter-category');
+            const currentSelected = selectFilter.value;
+            
+            // ดึงหมวดหมู่ทั้งหมดที่มีในระบบปัจจุบัน
+            const cats = new Set();
+            dbState.transactions.forEach(t => cats.add(t.category));
+
+            let html = '<option value="all">ทุกหมวดหมู่</option>';
+            cats.forEach(c => {
+                html += `<option value="${c}">${c}</option>`;
+            });
+            selectFilter.innerHTML = html;
+            selectFilter.value = currentSelected;
+        }
+
+        // จัดการคลิกจัดเรียงหัวตาราง
+        function toggleSort(field) {
+            if (dbState.sortField === field) {
+                dbState.sortAscending = !dbState.sortAscending;
+            } else {
+                dbState.sortField = field;
+                dbState.sortAscending = true;
+            }
+            renderLedgerTable();
+        }
+
+        // เรนเดอร์ตารางบัญชี
+        function renderLedgerTable() {
+            const searchVal = document.getElementById('tbl-search').value.toLowerCase().trim();
+            const filterType = document.getElementById('tbl-filter-type').value;
+            const filterCat = document.getElementById('tbl-filter-category').value;
+            const filterDate = document.getElementById('tbl-filter-date').value;
+
+            // คัดกรองข้อมูล
+            let filteredList = dbState.transactions.filter(tx => {
+                const matchesSearch = tx.title.toLowerCase().includes(searchVal) || 
+                                      tx.note.toLowerCase().includes(searchVal) || 
+                                      tx.category.toLowerCase().includes(searchVal);
+                const matchesType = filterType === 'all' || tx.type === filterType;
+                const matchesCategory = filterCat === 'all' || tx.category === filterCat;
+                const matchesDate = !filterDate || tx.date === filterDate;
+
+                return matchesSearch && matchesType && matchesCategory && matchesDate;
+            });
+
+            // จัดเรียงข้อมูล (Sort)
+            filteredList.sort((a, b) => {
+                let comparison = 0;
+                if (dbState.sortField === 'date') {
+                    const dateTimeA = `${a.date}T${a.time}`;
+                    const dateTimeB = `${b.date}T${b.time}`;
+                    comparison = dateTimeA.localeCompare(dateTimeB);
+                } else if (dbState.sortField === 'amount') {
+                    comparison = a.amount - b.amount;
+                }
+
+                return dbState.sortAscending ? comparison : -comparison;
+            });
+
+            const tbody = document.getElementById('tbl-ledger-body');
+            const emptyState = document.getElementById('tbl-empty-state');
+            tbody.innerHTML = '';
+
+            if (filteredList.length === 0) {
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            emptyState.classList.add('hidden');
+
+            filteredList.forEach(tx => {
+                const isExpense = tx.type === 'expense';
+                const row = document.createElement('tr');
+                row.className = "hover:bg-slate-100/50 dark:hover:bg-slate-800/20 transition-colors";
+                
+                // แปลงฟอร์แมตวันที่แบบไทย
+                const dObj = new Date(tx.date);
+                const thaiDateStr = dObj.toLocaleDateString('th-TH', { day: '2-digit', month: 'short' }) + ' ' + (dObj.getFullYear() + 543).toString().slice(-2);
+
+                row.innerHTML = `
+                    <td class="p-3 text-slate-600 dark:text-slate-300">
+                        <div class="font-medium">${thaiDateStr}</div>
+                        <div class="text-[10px] text-slate-400">${tx.time} น.</div>
+                    </td>
+                    <td class="p-3">
+                        <div class="font-bold text-slate-800 dark:text-white">${tx.title}</div>
+                        ${tx.note ? `<div class="text-[10px] text-slate-400 italic"><i class="fa-solid fa-memo mr-1"></i>${tx.note}</div>` : ''}
+                    </td>
+                    <td class="p-3">
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${isExpense ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}">
+                            <i class="${isExpense ? 'fa-solid fa-arrow-down-long mr-1' : 'fa-solid fa-arrow-up-long mr-1'}"></i> ${tx.category}
+                        </span>
+                    </td>
+                    <td class="p-3 text-right font-bold ${isExpense ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}">
+                        ${isExpense ? '-' : '+'}${tx.amount.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                    </td>
+                    <td class="p-3 text-center">
+                        <div class="flex items-center justify-center space-x-1">
+                            <button onclick="editTransaction('${tx.id}')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-blue-500" title="แก้ไขรายการ">
+                                <i class="fa-solid fa-pen-to-square"></i>
+                            </button>
+                            <button onclick="deleteTransaction('${tx.id}')" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-700 rounded text-rose-500" title="ลบรายการ">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // แก้ไขรายการบัญชี
+        window.editTransaction = function(id) {
+            const tx = dbState.transactions.find(t => t.id === id);
+            if (!tx) return;
+
+            document.getElementById('tx-id').value = tx.id;
+            document.getElementById('tx-date').value = tx.date;
+            document.getElementById('tx-time').value = tx.time;
+            document.getElementById('tx-title').value = tx.title;
+            document.getElementById('tx-amount').value = tx.amount;
+            document.getElementById('tx-note').value = tx.note;
+
+            const tabExpense = document.getElementById('tab-add-expense');
+            const tabIncome = document.getElementById('tab-add-income');
+
+            if (tx.type === 'expense') {
+                tabExpense.click();
+                document.getElementById('tx-category').value = tx.category;
+            } else {
+                tabIncome.click();
+                document.getElementById('tx-income-type').value = tx.category;
+            }
+
+            document.getElementById('btn-submit-text').textContent = 'บันทึกการแก้ไข';
+            document.getElementById('form-title').textContent = 'แก้ไขรายการธุรกรรม';
+            document.getElementById('btn-reset-form').classList.remove('hidden');
+
+            window.scrollTo({ top: document.getElementById('frm-transaction').offsetTop - 100, behavior: 'smooth' });
+        };
+
+        // ลบรายการบัญชี
+        window.deleteTransaction = function(id) {
+            // ไม่ใช้ confirm() window แบบโบราณตามเงื่อนไข iframe-friendly แต่สร้างการโต้ตอบที่ปลอดภัย
+            const isConfirmed = confirm("คุณแน่ใจหรือไม่ว่าต้องการลบรายการนี้?");
+            if (isConfirmed) {
+                dbState.transactions = dbState.transactions.filter(t => t.id !== id);
+                saveTripLedgerToLocal();
+                recalculateBudget();
+                renderLedgerTable();
+                showNotification('ลบรายการธุรกรรมเรียบร้อยแล้ว', 'success');
+            }
+        };
+
+        // สรุปข้อมูลหมวดหมู่และเรนเดอร์กราฟ Chart.js
+        function renderCharts(totalExpense) {
+            // สรุปยอดรายจ่ายแบ่งตามหมวดหมู่
+            const categorySums = {
+                'ค่าน้ำมัน': 0, 'ค่าอาหาร': 0, 'ค่าที่พัก': 0, 'ค่าเดินทาง': 0,
+                'ค่าทางด่วน': 0, 'ค่าเครื่องดื่ม': 0, 'ค่าของฝาก': 0, 'อื่นๆ': 0
             };
 
-            updateSystemStatus('pending', 'กำลังค้นหาสัญญาณ...');
-
-            // ติดตามการเคลื่อนไหวและดึงค่าพิกัดใหม่เสมอเมื่อตำแหน่งขยับ
-            watchId = navigator.geolocation.watchPosition(
-                handleGeoSuccess,
-                handleGeoError,
-                geoOptions
-            );
-        }
-
-        // เมื่อดึงข้อมูลพิกัดดาวเทียมสำเร็จ
-        function handleGeoSuccess(position) {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            const accuracy = position.coords.accuracy;
-            const speed = position.coords.speed; // คืนค่าความเร็ว m/s
-
-            // แสดงผลพิกัดลงหน้าจอแผงควบคุมหลัก
-            document.getElementById('lat-val').innerText = lat.toFixed(6);
-            document.getElementById('lon-val').innerText = lon.toFixed(6);
-            document.getElementById('sys-accuracy').innerText = `ความแม่นยำสูงสุด: ± ${Math.round(accuracy)} เมตร`;
-
-            // คำนวณความเร็ว (เมตรต่อวินาที -> กิโลเมตรต่อชั่วโมง)
-            if (speed && speed > 0.3) { 
-                const speedKmh = (speed * 3.6).toFixed(1);
-                document.getElementById('speed-val').innerText = `${speedKmh} กม./ชม.`;
-            } else {
-                document.getElementById('speed-val').innerText = '0.0 กม./ชม.';
-            }
-
-            // คำนวณระยะห่างจากพิกัดบ้านและแสดงผลบน HUD
-            const homeDistMeters = calculateDistance(lat, lon, HOME_LAT, HOME_LON);
-            const homeDistKm = (homeDistMeters / 1000).toFixed(2);
-            document.getElementById('home-distance-val').innerText = `${homeDistKm} กม.`;
-
-            updateSystemStatus('connected', 'ใช้งานเรียบร้อย');
-
-            const currentLatLng = [lat, lon];
-            updateTrackingOnMap(currentLatLng, accuracy);
-
-            // แปลงพิกัดเป็นที่อยู่ภาษาไทยตามระยะทางและเวลาที่กำหนดไว้ป้องกันปัญหา API บล็อก
-            triggerReverseGeocoding(lat, lon);
-        }
-
-        // จัดการเมื่อเปิด/ดึงพิกัดผิดพลาด
-        function handleGeoError(error) {
-            let errorMsg = "ไม่สามารถเชื่อมต่อตัวระบุตำแหน่งได้";
-            switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    errorMsg = "ผู้ใช้ปฏิเสธการเข้าถึงพิกัด กรุณาเปิดระบบระบุพิกัดในเบราว์เซอร์";
-                    updateSystemStatus('error', 'ถูกปฏิเสธสิทธิ์');
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    errorMsg = "ไม่มีสัญญาณระบุพิกัดในจุดที่ท่านอยู่ขณะนี้";
-                    updateSystemStatus('error', 'สูญเสียสัญญาณ GPS');
-                    break;
-                case error.TIMEOUT:
-                    errorMsg = "ค้นหาตําแหน่งหมดเวลา เนื่องจากพิกัดดาวเทียมตอบสนองช้า";
-                    updateSystemStatus('error', 'หมดเวลาระบุตำแหน่ง');
-                    break;
-                default:
-                    updateSystemStatus('error', 'ระบบขัดข้อง');
-            }
-            showWarning(errorMsg);
-        }
-
-        // ==========================================
-        // 4. การแสดงร่องรอยการเคลื่อนไหวบนแผนที่
-        // ==========================================
-        function updateTrackingOnMap(latLng, accuracy) {
-            // สไตล์หมุดปัจจุบันเรืองแสงสีฟ้า
-            const pulsingIcon = L.divIcon({
-                className: 'gps-pulse-marker',
-                iconSize: [36, 36],
-                iconAnchor: [18, 18]
+            dbState.transactions.forEach(t => {
+                if (t.type === 'expense') {
+                    const cat = t.category;
+                    if (categorySums[cat] !== undefined) {
+                        categorySums[cat] += t.amount;
+                    } else {
+                        categorySums['อื่นๆ'] += t.amount;
+                    }
+                }
             });
 
-            if (!userMarker) {
-                // สร้างหมุดตำแหน่งผู้ใช้และขอบเขตความคลาดเคลื่อน (วงกลม) เป็นครั้งแรก
-                userMarker = L.marker(latLng, { icon: pulsingIcon }).addTo(map);
-                
-                accuracyCircle = L.circle(latLng, {
-                    radius: accuracy,
-                    color: '#3b82f6',
-                    fillColor: '#3b82f6',
-                    fillOpacity: 0.12,
-                    weight: 1
-                }).addTo(map);
+            const labels = Object.keys(categorySums);
+            const dataValues = Object.values(categorySums);
+            const activeLabels = [];
+            const activeValues = [];
 
-                // หากตั้งเป็นล็อกหน้าจอกลางไว้ให้เปลี่ยนมุมกล้องหาผู้ใช้ทันที
-                if (autoCenter) {
-                    map.setView(latLng, 16);
+            // เก็บเฉพาะหมวดที่มีค่าใช้จ่ายจริงไปทำ Pie Chart
+            labels.forEach((l, i) => {
+                if (dataValues[i] > 0) {
+                    activeLabels.push(l);
+                    activeValues.push(dataValues[i]);
                 }
+            });
+
+            const chartColors = [
+                '#f59e0b', '#ef4444', '#3b82f6', '#10b981',
+                '#6366f1', '#ec4899', '#8b5cf6', '#64748b'
+            ];
+
+            // 1. Pie Chart
+            if (chartPie) chartPie.destroy();
+            const ctxPie = document.getElementById('chart-expenses-pie').getContext('2d');
+            
+            if (activeValues.length === 0) {
+                // กรณีไม่มีรายจ่ายเลย
+                chartPie = new Chart(ctxPie, {
+                    type: 'pie',
+                    data: {
+                        labels: ['ไม่มีรายจ่าย'],
+                        datasets: [{
+                            data: [1],
+                            backgroundColor: ['#e2e8f0']
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
             } else {
-                // อัปเดตพิกัดหมุดปัจจุบันและขอบเขตความคลาดเคลื่อน
-                userMarker.setLatLng(latLng);
-                accuracyCircle.setLatLng(latLng);
-                accuracyCircle.setRadius(accuracy);
-
-                if (autoCenter) {
-                    map.panTo(latLng);
-                }
+                chartPie = new Chart(ctxPie, {
+                    type: 'pie',
+                    data: {
+                        labels: activeLabels,
+                        datasets: [{
+                            data: activeValues,
+                            backgroundColor: chartColors.slice(0, activeLabels.length),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: true,
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    font: { size: 10, family: 'Prompt' },
+                                    color: document.documentElement.classList.contains('dark') ? '#cbd5e1' : '#475569'
+                                }
+                            }
+                        }
+                    }
+                });
             }
 
-            // คำนวณระยะทางสะสมถัดไป (ป้องกันปัญหาสัญญาณลอยสั่นในระยะต่ำกว่า 3 เมตร)
-            if (pathHistory.length > 0) {
-                const lastPoint = pathHistory[pathHistory.length - 1];
-                const deltaDist = calculateDistance(lastPoint[0], lastPoint[1], latLng[0], latLng[1]);
-                
-                if (deltaDist > 3) {
-                    totalDistance += deltaDist;
-                    pathHistory.push(latLng);
-                    routePolyline.setLatLngs(pathHistory);
-                    
-                    updateDistanceDisplay(totalDistance);
+            // 2. Bar Chart
+            if (chartBar) chartBar.destroy();
+            const ctxBar = document.getElementById('chart-expenses-bar').getContext('2d');
+            chartBar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'รายจ่ายแต่ละหมวด (บาท)',
+                        data: dataValues,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                font: { size: 9, family: 'Prompt' },
+                                color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                            },
+                            grid: { color: document.documentElement.classList.contains('dark') ? '#334155' : '#f1f5f9' }
+                        },
+                        x: {
+                            ticks: {
+                                font: { size: 9, family: 'Prompt' },
+                                color: document.documentElement.classList.contains('dark') ? '#94a3b8' : '#64748b'
+                            },
+                            grid: { display: false }
+                        }
+                    }
                 }
-            } else {
-                pathHistory.push(latLng);
-            }
+            });
         }
 
-        // ปรับการแสดงผลระยะทางสะสม
-        function updateDistanceDisplay(meters) {
-            const distanceText = document.getElementById('distance-val');
-            if (meters >= 1000) {
-                const km = (meters / 1000).toFixed(2);
-                distanceText.innerText = `${km} กม.`;
-            } else {
-                distanceText.innerText = `${Math.round(meters)} ม.`;
-            }
+        // ฟังก์ชัน Export JSON
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                initialBudget: dbState.initialBudget,
+                transactions: dbState.transactions
+            }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `trip-finance-export-${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+            showNotification('ส่งออกไฟล์ JSON เรียบร้อยแล้ว', 'success');
         }
 
-        // ==========================================
-        // 5. ระบบแปลงพิกัดเป็นชื่อสถานที่ภาษาไทย (Reverse Geocoding Logic)
-        // ==========================================
-        async function triggerReverseGeocoding(lat, lon) {
-            const now = Date.now();
-            const distanceShift = calculateDistance(lat, lon, lastFetchedCoords.lat, lastFetchedCoords.lon);
+        // ฟังก์ชัน Export CSV
+        function exportCSV() {
+            let csvContent = "\ufeff"; // BOM เพื่ออ่านภาษาไทยบน Excel
+            csvContent += "วันที่,เวลา,รายการ,ประเภท,หมวดหมู่,จำนวนเงิน,หมายเหตุ\n";
 
-            // ทำงานเมื่อเคลื่อนที่ห่างจากตำแหน่งเก่าเกิน 15 เมตร หรือระยะเวลาห่างกันเกิน 12 วินาทีขึ้นไป
-            if (now - lastGeocodeTime > 12000 || distanceShift > 15) {
-                lastGeocodeTime = now;
-                lastFetchedCoords = { lat, lon };
+            dbState.transactions.forEach(tx => {
+                const row = [
+                    tx.date,
+                    tx.time,
+                    `"${tx.title.replace(/"/g, '""')}"`,
+                    tx.type === 'expense' ? 'รายจ่าย' : 'รายรับ',
+                    tx.category,
+                    tx.amount,
+                    `"${(tx.note || '').replace(/"/g, '""')}"`
+                ].join(",");
+                csvContent += row + "\n";
+            });
 
-                setAddressUIStatus("กำลังค้นหาที่อยู่ภาษาไทย...");
+            const encodedUri = encodeURI("data:text/csv;charset=utf-8," + csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `trip-finance-export-${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            showNotification('ส่งออกไฟล์ CSV เรียบร้อยแล้ว', 'success');
+        }
 
+        // ฟังก์ชัน Import JSON
+        function importJSON(e) {
+            const fileReader = new FileReader();
+            fileReader.onload = function (event) {
                 try {
-                    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1&accept-language=th`;
-                    const response = await fetch(url, {
-                        headers: { 'User-Agent': 'ModernGPSTrackingHUDSystem/2.0' }
-                    });
-
-                    if (!response.ok) throw new Error('API request failed');
-
-                    const data = await response.json();
-                    
-                    if (data && data.address) {
-                        const addr = data.address;
-
-                        const suburb = addr.suburb || addr.village || addr.neighborhood || addr.subdistrict || addr.town || 'ไม่ระบุพื้นที่';
-                        const district = addr.district || addr.city_district || addr.city || addr.county || addr.amphoe || 'ไม่ระบุเขต';
-                        const province = addr.state || addr.province || addr.region || 'ไม่ระบุจังหวัด';
-
-                        document.getElementById('addr-suburb').innerText = cleanPrefix(suburb);
-                        document.getElementById('addr-district').innerText = cleanPrefix(district);
-                        document.getElementById('addr-province').innerText = cleanPrefix(province);
+                    const parsed = JSON.parse(event.target.result);
+                    if (parsed && typeof parsed.initialBudget === 'number' && Array.isArray(parsed.transactions)) {
+                        dbState.initialBudget = parsed.initialBudget;
+                        dbState.transactions = parsed.transactions;
+                        saveTripLedgerToLocal();
+                        recalculateBudget();
+                        renderLedgerTable();
+                        showNotification('นำเข้าข้อมูลบัญชีเรียบร้อยแล้ว', 'success');
                     } else {
-                        setAddressUIStatus("ไม่พบข้อมูลอาคารในรัศมีพิกัด");
+                        showNotification('รูปแบบไฟล์ JSON บัญชีไม่ถูกต้อง', 'error');
                     }
                 } catch (err) {
-                    console.error("Geocoding Error:", err);
-                    setAddressUIStatus("การสืบค้นข้อมูลที่อยู่ขัดข้อง");
+                    showNotification('เกิดข้อผิดพลาดในการอ่านไฟล์ JSON', 'error');
                 }
+            };
+            if (e.target.files[0]) {
+                fileReader.readAsText(e.target.files[0]);
             }
         }
 
-        function setAddressUIStatus(msg) {
-            document.getElementById('addr-suburb').innerText = msg;
-            document.getElementById('addr-district').innerText = '...';
-            document.getElementById('addr-province').innerText = '...';
-        }
 
-        function cleanPrefix(text) {
-            if (!text) return '-';
-            return text.replace('Tambon', '').replace('Amphoe', '').replace('Amphur', '').replace('District', '').trim();
-        }
-
-        // คำนวณระยะห่างระหว่างจุดพิกัดในสูตรคณิตศาสตร์เชิงมุม Haversine (เมตร)
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371000; // รัศมีโลกเฉลี่ย (เมตร)
-            const phi1 = lat1 * Math.PI/180;
-            const phi2 = lat2 * Math.PI/180;
-            const deltaPhi = (lat2-lat1) * Math.PI/180;
-            const deltaLambda = (lon2-lon1) * Math.PI/180;
-
-            const a = Math.sin(deltaPhi/2) * Math.sin(deltaPhi/2) +
-                      Math.cos(phi1) * Math.cos(phi2) *
-                      Math.sin(deltaLambda/2) * Math.sin(deltaLambda/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-
-            return R * c;
-        }
-
-        // ==========================================
-        // 6. การส่งออกประวัติเส้นทางการเดินทางจริงเป็น KML
-        // ==========================================
-        function downloadRouteAsKML() {
-            if (pathHistory.length === 0) {
-                showWarning("ไม่พบข้อมูลเส้นทางสำหรับการจัดเก็บประวัติและส่งออก");
+        // =========================================================================
+        // 6. GOOGLE MAPS MODULE (ส่วนที่ 2: แสดงพิกัดอุปกรณ์แบบเรียลไทม์)
+        // =========================================================================
+        
+        function injectGoogleMapsScript() {
+            // ดึง API Key
+            const apiKey = APP_CONFIG.googleMapsKey;
+            
+            if (!apiKey) {
+                // หากไม่มี Key ให้แสดงแผนที่จำลองโดยไม่ต้องเรียก Google Maps จริง
+                // หรือแจ้งให้ผู้ใช้เห็นว่าควรกรอก Key
+                setupFallbackMap();
                 return;
             }
 
-            let kmlData = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>GPS Path Tracking Route</name>
-    <description>ไฟล์พิกัดบันทึกเส้นทางเดินเรียลไทม์ ดาวน์โหลดผ่าน GPS PRO Web App</description>
-    <Style id="customPolyline">
-      <LineStyle>
-        <color>ffea3e3b</color>
-        <width>6</width>
-      </LineStyle>
-      <PolyStyle>
-        <fill>0</fill>
-      </PolyStyle>
-    </Style>
-    <Placemark>
-      <name>เส้นทางการเดินทางจริง</name>
-      <styleUrl>#customPolyline</styleUrl>
-      <LineString>
-        <tessellate>1</tessellate>
-        <coordinates>
-`;
-
-            pathHistory.forEach(point => {
-                const lat = Array.isArray(point) ? point[0] : point.lat;
-                const lon = Array.isArray(point) ? point[1] : point.lng;
-                kmlData += `          ${lon},${lat},0\n`;
-            });
-
-            kmlData += `        </coordinates>
-      </LineString>
-    </Placemark>
-  </Document>
-</kml>`;
-
-            const blob = new Blob([kmlData], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8' });
-            const downloadUrl = URL.createObjectURL(blob);
-            const downloadLink = document.createElement('a');
-            
-            const timestamp = new Date().toISOString().replace(/T/, '_').replace(/\..+/, '').replace(/:/g, '-');
-            
-            downloadLink.href = downloadUrl;
-            downloadLink.download = `GPS_Tracker_Route_${timestamp}.kml`;
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            document.body.removeChild(downloadLink);
-            URL.revokeObjectURL(downloadUrl);
+            const script = document.createElement('script');
+            script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initGoogleMap`;
+            script.async = true;
+            script.defer = true;
+            script.onerror = () => {
+                showNotification('ไม่สามารถดาวน์โหลด Google Maps API ได้ กรุณาตรวจสอบ Key หรือสิทธิ์การใช้งาน', 'error');
+                setupFallbackMap();
+            };
+            document.head.appendChild(script);
         }
 
-        // ==========================================
-        // 7. การทำงานของปุ่มควบคุมและหน้าตาการตอบรับ (Interactive Event Handlers)
-        // ==========================================
-        function setupInteractiveEvents() {
-            // ปุ่มดาวน์โหลดไฟล์เส้นทาง KML
-            document.getElementById('btn-export-kml').addEventListener('click', downloadRouteAsKML);
+        // ตัวแปรสำหรับทำ Fallback จำลองแผนที่บนเบราว์เซอร์กรณีไม่มี API Key (เพื่อความสะดวกและรันได้ 100% เสมอ)
+        function setupFallbackMap() {
+            const container = document.getElementById('map-canvas');
+            container.innerHTML = `
+                <div class="absolute inset-0 bg-slate-800 flex flex-col items-center justify-center text-center p-6 text-white">
+                    <div class="p-4 bg-slate-700/50 rounded-2xl border border-slate-600 max-w-md">
+                        <i class="fa-solid fa-satellite-dish text-4xl text-blue-400 mb-3 animate-pulse"></i>
+                        <h4 class="font-bold text-sm mb-2">Google Maps SDK Simulator</h4>
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            ระบบทำงานในโหมด "จำลองแผนที่" เนื่องจากไม่ได้ระบุ Google Maps API Key <br>
+                            แต่คุณยังคงเห็นตำแหน่งอุปกรณ์, ทิศทาง และการคำนวณระยะห่างทางคณิตศาสตร์จากพิกัดจำลอง <br>
+                            รวมทั้งตรวจสอบข้อมูลที่อยู่ (Reverse Geocoding) แบบ Mock ได้ทันที!
+                        </p>
+                    </div>
+                </div>
+            `;
+            // รันฟังก์ชันอัปเดตระยะทาง ข้อมูลตำแหน่ง เป็นค่าเริ่มต้น
+            updateDeviceTelemetry();
+        }
 
-            // ปุ่มสลับเลเยอร์แผนที่ (ปกติ / ดาวเทียม Google Satellite Hybrid)
-            document.getElementById('btn-toggle-layer').addEventListener('click', () => {
-                const btnLayer = document.getElementById('btn-toggle-layer');
+        // เรียกใช้งานเมื่อ Google Maps โหลดเสร็จเรียบร้อย
+        window.initGoogleMap = function() {
+            document.getElementById('map-placeholder').classList.add('hidden');
+            
+            const initPos = { lat: dbState.deviceGPS.lat, lng: dbState.deviceGPS.lng };
+            const homePos = APP_CONFIG.homeCoords;
+
+            // กำหนดแผนที่แบบภาพดาวเทียม (Satellite / Hybrid)
+            gMap = new google.maps.Map(document.getElementById('map-canvas'), {
+                zoom: 14,
+                center: initPos,
+                mapTypeId: 'hybrid', // ภาพถ่ายดาวเทียมแบบผสมถนนและป้าย
+                fullscreenControl: true,
+                zoomControl: true,
+                scaleControl: true,
+                streetViewControl: true,
+                mapTypeControl: true
+            });
+
+            // หมุดตำแหน่งบ้าน (Home Marker)
+            gHomeMarker = new google.maps.Marker({
+                position: homePos,
+                map: gMap,
+                title: 'บ้าน',
+                icon: {
+                    url: 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'
+                }
+            });
+
+            // หมุดตำแหน่งอุปกรณ์เคลื่อนที่
+            gMarker = new google.maps.Marker({
+                position: initPos,
+                map: gMap,
+                title: 'อุปกรณ์พิกัดปัจจุบัน',
+                icon: {
+                    url: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                }
+            });
+
+            // จัดการล็อกตำแหน่งกึ่งกลางแผนที่
+            document.getElementById('btn-lock-center').addEventListener('click', () => {
+                dbState.isLockCenter = !dbState.isLockCenter;
+                const txt = document.getElementById('lock-center-text');
+                const btn = document.getElementById('btn-lock-center');
+                if (dbState.isLockCenter) {
+                    txt.textContent = 'ล็อกกึ่งกลาง (เปิด)';
+                    btn.className = "px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 text-xs font-semibold rounded-lg flex items-center transition shadow-sm";
+                    gMap.setCenter({ lat: dbState.deviceGPS.lat, lng: dbState.deviceGPS.lng });
+                } else {
+                    txt.textContent = 'ล็อกกึ่งกลาง (ปิด)';
+                    btn.className = "px-3 py-1.5 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-400 text-xs font-semibold rounded-lg flex items-center transition shadow-sm";
+                }
+            });
+
+            // ถ้าผู้ใช้ขยับ/ลากแผนที่เอง ให้ปิดการล็อกชั่วคราว
+            gMap.addListener('dragstart', () => {
+                if (dbState.isLockCenter) {
+                    dbState.isLockCenter = false;
+                    const txt = document.getElementById('lock-center-text');
+                    const btn = document.getElementById('btn-lock-center');
+                    txt.textContent = 'ล็อกกึ่งกลาง (ปิด)';
+                    btn.className = "px-3 py-1.5 bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-400 text-xs font-semibold rounded-lg flex items-center transition shadow-sm";
+                    showNotification('ปิดการล็อกแผนที่ชั่วคราวเนื่องจากคุณเลื่อนแผนที่เอง', 'info');
+                }
+            });
+
+            updateDeviceTelemetry();
+        };
+
+        // ฟังก์ชันคำนวณระยะห่างระหว่างจุด 2 จุดด้วยสูตร Haversine (กิโลเมตร)
+        function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // รัศมีเฉลี่ยโลก (กิโลเมตร)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // ระยะทาง (กิโลเมตร)
+        }
+
+        // ฟังก์ชันแปลงมุม Heading (องศา) เป็น ทิศภาษาไทย
+        function headingToDirectionThai(deg) {
+            const directions = ['เหนือ', 'ตะวันออกเฉียงเหนือ', 'ตะวันออก', 'ตะวันออกเฉียงใต้', 'ใต้', 'ตะวันตกเฉียงใต้', 'ตะวันตก', 'ตะวันตกเฉียงเหนือ'];
+            const index = Math.round(((deg % 360) / 45)) % 8;
+            return `${directions[index]} (${deg.toFixed(0)}°)`;
+        }
+
+        // อัปเดตข้อมูลพิกัดและความเคลื่อนไหวล่าสุดของอุปกรณ์
+        function updateDeviceTelemetry() {
+            const gps = dbState.deviceGPS;
+            const home = APP_CONFIG.homeCoords;
+
+            // คำนวณระยะห่างจากบ้าน
+            const distance = calculateHaversineDistance(home.lat, home.lng, gps.lat, gps.lng);
+
+            // อัปเดต Dashboard
+            document.getElementById('dash-distance').textContent = distance.toFixed(2) + ' km';
+            document.getElementById('txt-distance-val').textContent = distance.toFixed(2) + ' km';
+            
+            // อัปเดตข้อมูลพิกัด
+            document.getElementById('txt-gps-coords').textContent = `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}`;
+            document.getElementById('txt-gps-speed-dir').textContent = `${gps.speed.toFixed(1)} km/h | ${headingToDirectionThai(gps.heading)}`;
+            
+            // อัปเดตเวลาล่าสุด
+            const tObj = new Date(gps.timestamp);
+            document.getElementById('txt-gps-time').textContent = tObj.toLocaleTimeString('th-TH');
+
+            // อัปเดตหมุดบนแผนที่ Google Maps ถ้าโหลดสำเร็จ
+            if (gMap && gMarker) {
+                const newPos = { lat: gps.lat, lng: gps.lng };
+                gMarker.setPosition(newPos);
                 
-                if (currentLayerType === 'osm') {
-                    // ลบเลเยอร์ OSM และแทนที่ด้วยเลเยอร์ดาวเทียม Google Hybrid
-                    map.removeLayer(osmLayer);
-                    googleSatelliteLayer.addTo(map);
-                    currentLayerType = 'satellite';
-                    
-                    // ปรับแต่ง UI ปุ่มเปลี่ยนเลเยอร์ให้ดูลอยตัวตัดแสงอย่างสวยงาม
-                    btnLayer.className = "w-12 h-12 bg-indigo-600 text-white rounded-2xl shadow-indigo-glow border border-indigo-400 flex items-center justify-center transition-all duration-300 transform active:scale-90";
-                    btnLayer.querySelector('svg').className = "w-6 h-6 text-white";
-                } else {
-                    // ลบเลเยอร์ดาวเทียม Google และแทนที่ด้วยเลเยอร์ OSM ปกติ
-                    map.removeLayer(googleSatelliteLayer);
-                    osmLayer.addTo(map);
-                    currentLayerType = 'osm';
-                    
-                    btnLayer.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-700 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90";
-                    btnLayer.querySelector('svg').className = "w-6 h-6 text-brand-600";
+                if (dbState.isLockCenter) {
+                    gMap.panTo(newPos);
                 }
-            });
+            }
 
-            // ปุ่มย่อ/ขยายแผงแผงควบคุมหลัก
-            const btnMinimize = document.getElementById('btn-minimize');
-            const dashboardCard = document.getElementById('dashboard-card');
-            const minimizeText = document.getElementById('minimize-text');
-            const minimizeIcon = document.getElementById('minimize-icon');
-            let isMinimized = false;
+            // ทำการหาข้อมูลที่อยู่ (Reverse Geocoding)
+            fetchReverseGeocode(gps.lat, gps.lng);
+        }
 
-            btnMinimize.addEventListener('click', () => {
-                isMinimized = !isMinimized;
-                if (isMinimized) {
-                    dashboardCard.querySelector('.bg-white\\/90').classList.add('hidden');
-                    minimizeText.innerText = "เปิดแผงควบคุม";
-                    minimizeIcon.classList.add('rotate-180');
-                } else {
-                    dashboardCard.querySelector('.bg-white\\/90').classList.remove('hidden');
-                    minimizeText.innerText = "ซ่อนแผงควบคุม";
-                    minimizeIcon.classList.remove('rotate-180');
+        // ค้นหาข้อมูลที่อยู่จากพิกัด (Reverse Geocoding)
+        async function fetchReverseGeocode(lat, lng) {
+            const apiKey = APP_CONFIG.googleMapsKey;
+            const addressText = document.getElementById('txt-address');
+            const dashCity = document.getElementById('dash-city');
+
+            if (!apiKey) {
+                // Mock Reverse Geocode (จำลองตามพิกัดจำลองของเครื่องเล่น)
+                const mockAddresses = [
+                    "ตำบล ในเมือง, อำเภอเมืองนครราชสีมา, จังหวัดนครราชสีมา, 30000, ประเทศไทย",
+                    "บ้านเลขที่ 45/2 ถนนยมราช, ต.ในเมือง, อ.เมือง, จ.นครราชสีมา, 30000",
+                    "ต.ปากช่อง, อ.ปากช่อง, จ.นครราชสีมา, 30130, ประเทศไทย",
+                    "ใกล้ คลองแสนแสบ ต.คลองสอง, อ.คลองหลวง, จ.ปทุมธานี, 12120",
+                    "ต.หนองปรือ, อ.บางละมุง, จ.ชลบุรี, 20150, ประเทศไทย"
+                ];
+                
+                // สุ่ม/เปลี่ยนตามความใกล้ไกล
+                let matchedAddr = mockAddresses[0];
+                let mockProvince = "นครราชสีมา";
+                if (lat > 15.8) {
+                    matchedAddr = "ตำบลในเมือง, อำเภอแก่งสนามนาง, จังหวัดนครราชสีมา, 30440, ประเทศไทย";
+                    mockProvince = "แก่งสนามนาง, โคราช";
+                } else if (lat < 14) {
+                    matchedAddr = mockAddresses[4];
+                    mockProvince = "บางละมุง, ชลบุรี";
                 }
-            });
+                
+                addressText.textContent = matchedAddr;
+                dashCity.textContent = mockProvince;
+                return;
+            }
 
-            // ปุ่มเริ่ม/หยุดติดตาม GPS ชั่วคราว
-            const btnToggleTracking = document.getElementById('btn-toggle-tracking');
-            btnToggleTracking.addEventListener('click', () => {
-                isTrackingActive = !isTrackingActive;
-                const statusDot = document.getElementById('tracking-status-dot');
-                const statusText = document.getElementById('tracking-status-text');
+            try {
+                const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${apiKey}&language=th`);
+                const data = await response.json();
+                
+                if (data.status === "OK" && data.results.length > 0) {
+                    const formattedAddress = data.results[0].formatted_address;
+                    addressText.textContent = formattedAddress;
 
-                if (isTrackingActive) {
-                    btnToggleTracking.className = "flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-rose-200 bg-rose-50 text-rose-600 font-semibold text-xs transition-all hover:bg-rose-100";
-                    statusDot.className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
-                    statusText.innerText = "หยุดติดตามชั่วคราว";
-                    startTracking();
-                } else {
-                    btnToggleTracking.className = "flex items-center justify-center space-x-2 py-3 px-2 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 font-semibold text-xs transition-all hover:bg-emerald-100";
-                    statusDot.className = "w-2 h-2 rounded-full bg-emerald-500";
-                    statusText.innerText = "เริ่มระบบติดตาม";
-                    
-                    if (watchId !== null) {
-                        navigator.geolocation.clearWatch(watchId);
-                        watchId = null;
+                    // หาจังหวัดสำหรับอัปเดตลง Dashboard Card
+                    let provinceName = "ต่างจังหวัด";
+                    const addressComponents = data.results[0].address_components;
+                    for (let comp of addressComponents) {
+                        if (comp.types.includes("administrative_area_level_1")) {
+                            provinceName = comp.long_name;
+                            break;
+                        }
                     }
-                    updateSystemStatus('pending', 'หยุดติดตามพิกัดแล้ว');
+                    dashCity.textContent = provinceName;
+                } else {
+                    addressText.textContent = "ไม่สามารถระบุพิกัดที่อยู่ได้";
+                    dashCity.textContent = "ไม่ทราบจังหวัด";
                 }
+            } catch (error) {
+                addressText.textContent = "ข้อผิดพลาดในการเชื่อมต่อ Reverse Geocoding API";
+            }
+        }
+
+        // =========================================================================
+        // 7. REAL-TIME DATA: WEATHER & OIL PRICES (ส่วนที่ 3: ดึงข้อมูลเสริม)
+        // =========================================================================
+        
+        // ดึงข้อมูลราคาน้ำมัน
+        function fetchOilPrices() {
+            // โครงสร้าง Mock Data ราคาน้ำมันขายปลีก (ในอนาคตเปลี่ยนเป็น API endpoint ได้)
+            const mockOilData = {
+                PTT: {
+                    logo: "https://logos-world.net/wp-content/uploads/2023/04/PTT-Logo.png", // โลโก้ทดแทน
+                    name: "ปตท. (OR)",
+                    prices: [
+                        { name: "Premium ดีเซล", price: 46.24 },
+                        { name: "ดีเซล B7", price: 32.94 },
+                        { name: "แก๊สโซฮอล์ 95", price: 37.85 },
+                        { name: "แก๊สโซฮอล์ 91", price: 37.58 },
+                        { name: "แก๊สโซฮอล์ E20", price: 35.74 },
+                        { name: "เบนซิน 95", price: 45.94 }
+                    ]
+                },
+                Bangchak: {
+                    logo: "https://www.bangchak.co.th/assets/images/logo.png",
+                    name: "บางจาก (BCP)",
+                    prices: [
+                        { name: "Premium ดีเซล B7", price: 47.44 },
+                        { name: "ดีเซล B7", price: 32.94 },
+                        { name: "แก๊สโซฮอล์ 95", price: 37.85 },
+                        { name: "แก๊สโซฮอล์ 91", price: 37.58 },
+                        { name: "แก๊สโซฮอล์ E20", price: 35.74 },
+                        { name: "แก๊สโซฮอล์ E85", price: 34.00 }
+                    ]
+                },
+                Shell: {
+                    logo: "https://upload.wikimedia.org/wikipedia/en/thumb/e/e3/Shell_Logo_generic.svg/1200px-Shell_Logo_generic.svg.png",
+                    name: "เชลล์ (Shell)",
+                    prices: [
+                        { name: "Shell V-Power ดีเซล", price: 49.99 },
+                        { name: "Shell FuelSave ดีเซล B7", price: 33.44 },
+                        { name: "Shell V-Power แก๊สโซฮอล์ 95", price: 49.54 },
+                        { name: "Shell FuelSave แก๊สโซฮอล์ 95", price: 38.34 },
+                        { name: "Shell FuelSave แก๊สโซฮอล์ E20", price: 36.14 }
+                    ]
+                },
+                PT: {
+                    logo: "https://www.ptgenergyltd.com/assets/img/logo.png",
+                    name: "พีที (PTG)",
+                    prices: [
+                        { name: "ดีเซล B7", price: 32.94 },
+                        { name: "แก๊สโซฮอล์ 95", price: 37.85 },
+                        { name: "แก๊สโซฮอล์ 91", price: 37.58 },
+                        { name: "แก๊สโซฮอล์ E20", price: 35.74 },
+                        { name: "เบนซิน 95", price: 46.44 }
+                    ]
+                }
+            };
+
+            const tabsContainer = document.getElementById('oil-brand-tabs');
+            const pricesContainer = document.getElementById('oil-prices-list');
+            tabsContainer.innerHTML = '';
+
+            let firstBrand = null;
+            Object.keys(mockOilData).forEach((brandKey, idx) => {
+                if (idx === 0) firstBrand = brandKey;
+                const brand = mockOilData[brandKey];
+                
+                // สร้างแท็บปุ่มปั๊มน้ำมัน
+                const tabBtn = document.createElement('button');
+                tabBtn.className = `flex-1 py-1 text-[10px] font-bold rounded-lg text-center transition ${idx === 0 ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`;
+                tabBtn.textContent = brandKey;
+                tabBtn.addEventListener('click', () => {
+                    // ลบสไตล์แท็บเดิมออก
+                    Array.from(tabsContainer.children).forEach(b => {
+                        b.className = "flex-1 py-1 text-[10px] font-bold rounded-lg text-center text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition";
+                    });
+                    // ใส่สไตล์แท็บที่กดเลือก
+                    tabBtn.className = "flex-1 py-1 text-[10px] font-bold rounded-lg text-center bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-blue-400 transition";
+                    displayPricesForBrand(brand);
+                });
+                tabsContainer.appendChild(tabBtn);
             });
 
-            // ปุ่มเลื่อนมุมมองกล้องแผนที่ไปที่พิกัดบ้าน
-            document.getElementById('btn-focus-home').addEventListener('click', () => {
-                setAutoCenter(false);
-                map.setView([HOME_LAT, HOME_LON], 17);
-                if (homeMarker) {
-                    homeMarker.openPopup();
-                }
-            });
+            // แสดงยี่ห้อแรกเป็นค่าเริ่มต้น
+            if (firstBrand) {
+                displayPricesForBrand(mockOilData[firstBrand]);
+            }
 
-            // ปุ่มล้างเส้นประวัติการเดินทางบนแผนที่
-            document.getElementById('btn-clearhistory').addEventListener('click', () => {
-                pathHistory = [];
-                totalDistance = 0;
-                updateDistanceDisplay(0);
-                if (routePolyline) {
-                    routePolyline.setLatLngs([]);
+            // ปุ่มรีเฟรชจำลองราคาน้ำมันผันผวน
+            document.getElementById('btn-refresh-oil').addEventListener('click', () => {
+                // จำลองความผันผวนเล็กน้อย +- 0.20 บาท
+                Object.keys(mockOilData).forEach(b => {
+                    mockOilData[b].prices.forEach(o => {
+                        o.price += (Math.random() - 0.5) * 0.4;
+                    });
+                });
+                const activeTab = Array.from(tabsContainer.children).find(b => b.className.includes('bg-white'));
+                if (activeTab) {
+                    displayPricesForBrand(mockOilData[activeTab.textContent]);
                 }
-                if (userMarker) {
-                    pathHistory.push(userMarker.getLatLng());
-                }
-            });
-
-            // ปุ่มควบคุมการซูมและจัดศูนย์กลาง
-            document.getElementById('btn-zoom-in').addEventListener('click', () => map.zoomIn());
-            document.getElementById('btn-zoom-out').addEventListener('click', () => map.zoomOut());
-
-            const btnAutoCenter = document.getElementById('btn-autocenter');
-            btnAutoCenter.addEventListener('click', () => {
-                setAutoCenter(!autoCenter);
-                if (autoCenter && userMarker) {
-                    map.setView(userMarker.getLatLng(), 16);
-                }
+                showNotification('จำลองการอัปเดตราคาน้ำมันขายปลีกรอบล่าสุดสำเร็จ', 'info');
             });
         }
 
-        // ฟังก์ชันอัปเดตสถานะการล็อกหน้าจอกลาง
-        function setAutoCenter(active) {
-            autoCenter = active;
-            const btn = document.getElementById('btn-autocenter');
-            const icon = document.getElementById('autocenter-icon');
+        // ฟังก์ชันช่วยแสดงผลรายการราคาน้ำมันของปั๊มที่เลือก
+        function displayPricesForBrand(brandData) {
+            const pricesContainer = document.getElementById('oil-prices-list');
+            const logoImg = document.getElementById('oil-brand-logo');
+            const nameLbl = document.getElementById('oil-brand-name');
+            const updateTimeLbl = document.getElementById('oil-update-time');
+
+            pricesContainer.innerHTML = '';
             
-            if (active) {
-                btn.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-brand-600 rounded-2xl shadow-premium border border-white/40 flex items-center justify-center transition-all duration-300 transform active:scale-90";
-                icon.className = "w-6 h-6 animate-spin-slow text-brand-600";
+            // แสดงโลโก้และชื่อ
+            if (brandData.logo) {
+                logoImg.src = brandData.logo;
+                logoImg.classList.remove('hidden');
+                // จัดการ Error กรณีรูปไม่โหลดหรือ Link เสีย
+                logoImg.onerror = () => { logoImg.classList.add('hidden'); };
             } else {
-                btn.className = "w-12 h-12 bg-white/90 backdrop-blur-md hover:bg-slate-50 text-slate-400 rounded-2xl shadow-premium border border-slate-100 flex items-center justify-center transition-all duration-300 transform active:scale-90";
-                icon.className = "w-6 h-6 text-slate-400";
+                logoImg.classList.add('hidden');
             }
+            nameLbl.textContent = brandData.name;
+            updateTimeLbl.textContent = 'อัปเดตล่าสุด: ' + new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.';
+
+            // เรนเดอร์รายการน้ำมันแต่ละชนิด
+            let gasohol95Price = "รอข้อมูล...";
+            brandData.prices.forEach(oil => {
+                if (oil.name === 'แก๊สโซฮอล์ 95' || oil.name === 'Shell FuelSave แก๊สโซฮอล์ 95') {
+                    gasohol95Price = oil.price.toFixed(2) + " ฿/ลิตร";
+                }
+
+                const item = document.createElement('div');
+                item.className = "flex justify-between items-center text-xs py-1.5 border-b border-slate-100 dark:border-slate-800/50 last:border-0";
+                
+                let iconClass = "fa-solid fa-droplet text-blue-500";
+                if (oil.name.includes("ดีเซล")) iconClass = "fa-solid fa-truck-field text-slate-500";
+                else if (oil.name.includes("Premium") || oil.name.includes("Power")) iconClass = "fa-solid fa-bolt text-amber-500";
+
+                item.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <i class="${iconClass}"></i>
+                        <span class="font-medium text-slate-700 dark:text-slate-300">${oil.name}</span>
+                    </div>
+                    <span class="font-extrabold text-slate-800 dark:text-white">${oil.price.toFixed(2)} <span class="text-[10px] font-normal text-slate-400">฿/L</span></span>
+                `;
+                pricesContainer.appendChild(item);
+            });
+
+            // อัปเดตราคากลางบน Dashboard การ์ด 4
+            document.getElementById('dash-fuel').textContent = `แก๊สโซฮอล์ 95: ${gasohol95Price}`;
         }
 
-        // จัดการและอัปเดตแผงบอกประเภทสัญญาณ
-        function updateSystemStatus(type, message) {
-            const badge = document.getElementById('status-badge');
-            const statusText = document.getElementById('status-text');
-            statusText.innerText = message;
+        // ดึงสภาพอากาศจาก OpenWeatherMap API ตามพิกัดอุปกรณ์จริง
+        async function fetchWeatherConditions() {
+            const apiKey = APP_CONFIG.openWeatherKey;
+            const gps = dbState.deviceGPS;
 
-            if (type === 'connected') {
-                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
-                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping";
-            } else if (type === 'error') {
-                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-red-500/10 text-red-400 border border-red-500/20";
-                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-red-500";
-            } else if (type === 'pending') {
-                badge.className = "px-3 py-1 rounded-full text-xs font-semibold flex items-center space-x-2 bg-amber-500/10 text-amber-400 border border-amber-500/20";
-                badge.querySelector('span').className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse";
-            }
-        }
-
-        // ฟังก์ชันป๊อปอัพแจ้งเตือนแบบด่วน (Toast Alert)
-        function showWarning(text) {
-            const toast = document.getElementById('warning-toast');
-            document.getElementById('warning-text').innerText = text;
-            toast.classList.remove('hidden');
+            const dashTemp = document.getElementById('dash-temp');
+            const dashIcon = document.getElementById('dash-weather-icon');
             
-            setTimeout(() => {
-                closeWarning();
-            }, 6000);
+            const wLoc = document.getElementById('weather-location');
+            const wDesc = document.getElementById('weather-description');
+            const wTemp = document.getElementById('weather-temp');
+            const wFeels = document.getElementById('weather-feels');
+            const wHumid = document.getElementById('weather-humidity');
+            const wWind = document.getElementById('weather-wind');
+            const wUv = document.getElementById('weather-uv');
+            const wClouds = document.getElementById('weather-clouds');
+            const wVis = document.getElementById('weather-visibility');
+            const wTime = document.getElementById('weather-update-time');
+
+            const nowTimeStr = new Date().toLocaleTimeString('th-TH');
+
+            if (!apiKey) {
+                // Mock Weather Data กรณีไม่มี API Key
+                // แกล้งจำลองอุณหภูมิร้อนเย็นตามช่วงเวลาจริงนิดหน่อย
+                const baseTemp = 31.5 + (Math.sin(new Date().getHours() / 4) * 3);
+                
+                wLoc.textContent = "จำลองสภาพอากาศ";
+                wDesc.textContent = "ท้องฟ้าปลอดโปร่ง มีเมฆบางส่วน";
+                wTemp.textContent = `${baseTemp.toFixed(1)}°C`;
+                wFeels.textContent = `รู้สึกเหมือน: ${(baseTemp + 1.5).toFixed(1)}°C`;
+                wHumid.textContent = "68%";
+                wWind.textContent = "3.2 m/s";
+                wUv.textContent = "7.5 (สูง)";
+                wClouds.textContent = "25%";
+                wVis.textContent = "10 km";
+                wTime.textContent = `อัปเดต (Mock): ${nowTimeStr}`;
+
+                dashTemp.textContent = `${baseTemp.toFixed(1)} °C`;
+                dashIcon.className = "fa-solid fa-cloud-sun text-2xl text-amber-500 animate-pulse";
+                return;
+            }
+
+            try {
+                const response = await fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${gps.lat}&lon=${gps.lng}&appid=${apiKey}&units=metric&lang=th`);
+                const data = await response.json();
+
+                if (data && data.cod === 200) {
+                    const temp = data.main.temp;
+                    const feels = data.main.feels_like;
+                    const desc = data.weather[0].description;
+                    const humidity = data.main.humidity;
+                    const windSpeed = data.wind.speed;
+                    const clouds = data.clouds.all;
+                    const visibility = (data.visibility / 1000).toFixed(0);
+                    const city = data.name || "พิกัดอุปกรณ์";
+                    const weatherIconCode = data.weather[0].icon;
+
+                    // กำหนด Icon จาก Font Awesome ตามสภาพอากาศ OpenWeather
+                    let faIconClass = "fa-solid fa-cloud";
+                    if (weatherIconCode.includes('01')) faIconClass = "fa-solid fa-sun text-amber-500";
+                    else if (weatherIconCode.includes('02')) faIconClass = "fa-solid fa-cloud-sun text-amber-500";
+                    else if (weatherIconCode.includes('03') || weatherIconCode.includes('04')) faIconClass = "fa-solid fa-cloud text-slate-400";
+                    else if (weatherIconCode.includes('09') || weatherIconCode.includes('10')) faIconClass = "fa-solid fa-cloud-showers-heavy text-blue-400";
+                    else if (weatherIconCode.includes('11')) faIconClass = "fa-solid fa-cloud-bolt text-indigo-500";
+                    else if (weatherIconCode.includes('13')) faIconClass = "fa-regular fa-snowflake text-blue-200";
+                    else if (weatherIconCode.includes('50')) faIconClass = "fa-solid fa-smog text-slate-300";
+
+                    wLoc.textContent = city;
+                    wDesc.textContent = desc.charAt(0).toUpperCase() + desc.slice(1);
+                    wTemp.textContent = `${temp.toFixed(1)}°C`;
+                    wFeels.textContent = `รู้สึกเหมือน: ${feels.toFixed(1)}°C`;
+                    wHumid.textContent = `${humidity}%`;
+                    wWind.textContent = `${windSpeed} m/s`;
+                    wUv.textContent = "7.0 (UV Index)"; // Standard fallback เนื่องจาก Free tier บางตัวไม่มีค่า UV
+                    wClouds.textContent = `${clouds}%`;
+                    wVis.textContent = `${visibility} km`;
+                    wTime.textContent = `อัปเดต: ${nowTimeStr}`;
+
+                    dashTemp.textContent = `${temp.toFixed(1)} °C`;
+                    dashIcon.className = faIconClass + " text-2xl animate-pulse";
+                } else {
+                    wDesc.textContent = "ไม่สามารถอ่านค่าสภาพอากาศจาก API Key นี้ได้";
+                }
+            } catch (error) {
+                wDesc.textContent = "ล้มเหลวในการเชื่อมต่อเซิร์ฟเวอร์ Weather";
+            }
         }
 
-        function closeWarning() {
-            const toast = document.getElementById('warning-toast');
-            toast.classList.add('hidden');
+
+        // =========================================================================
+        // 8. DEVICE SIMULATION CONTROL (ตัวควบคุมการจำลองการขับขี่ของเครื่องส่งสัญญาณ)
+        // =========================================================================
+        function initSimulationControls() {
+            const btnStart = document.getElementById('sim-start');
+            const btnStop = document.getElementById('sim-stop');
+            const btnReset = document.getElementById('sim-reset');
+            const lblSpeed = document.getElementById('sim-speed-text');
+
+            // รายการพิกัดจำลองการเดินทาง (สมมติว่าเป็นพิกัดเดินทางลงทิศใต้จากชัยภูมิ ผ่านโคราช ไปชลบุรี)
+            const simulatedRoute = [
+                { lat: 15.729762, lng: 102.294181, speed: 0, heading: 180 }, // บ้านเริ่มต้น
+                { lat: 15.652132, lng: 102.284562, speed: 65, heading: 185 },
+                { lat: 15.525211, lng: 102.245231, speed: 90, heading: 190 },
+                { lat: 15.351231, lng: 102.151234, speed: 105, heading: 175 },
+                { lat: 15.112154, lng: 102.051515, speed: 110, heading: 160 }, // โคราช
+                { lat: 14.851212, lng: 101.815121, speed: 85, heading: 210 },
+                { lat: 14.512121, lng: 101.551212, speed: 95, heading: 195 },
+                { lat: 14.215121, lng: 101.215151, speed: 115, heading: 180 },
+                { lat: 13.851212, lng: 100.915121, speed: 120, heading: 220 }, // เข้าเขตบางละมุง พัทยา
+                { lat: 13.512121, lng: 100.812121, speed: 45, heading: 240 },
+                { lat: 13.251212, lng: 100.801515, speed: 10, heading: 270 }
+            ];
+
+            btnStart.addEventListener('click', () => {
+                if (isSimulationRunning) return;
+                isSimulationRunning = true;
+                showNotification('เริ่มต้นโหมดจำลองการเคลื่อนที่ของอุปกรณ์', 'success');
+
+                simIntervalId = setInterval(() => {
+                    simStep = (simStep + 1) % simulatedRoute.length;
+                    const target = simulatedRoute[simStep];
+                    
+                    dbState.deviceGPS = {
+                        lat: target.lat,
+                        lng: target.lng,
+                        speed: target.speed,
+                        heading: target.heading,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    lblSpeed.textContent = `${target.speed} km/h`;
+                    updateDeviceTelemetry();
+
+                    // อัปเดตสภาพอากาศรอบพิกัดปัจจุบันเป็นระยะๆ
+                    if (simStep % 3 === 0) {
+                        fetchWeatherConditions();
+                    }
+
+                }, 4000); // จำลองการอัปเดตจากอุปกรณ์ทุกๆ 4 วินาที
+            });
+
+            btnStop.addEventListener('click', () => {
+                if (!isSimulationRunning) return;
+                clearInterval(simIntervalId);
+                isSimulationRunning = false;
+                lblSpeed.textContent = `0 km/h`;
+                showNotification('หยุดการทำงานโหมดจำลอง', 'info');
+            });
+
+            btnReset.addEventListener('click', () => {
+                clearInterval(simIntervalId);
+                isSimulationRunning = false;
+                simStep = 0;
+                
+                dbState.deviceGPS = {
+                    lat: APP_CONFIG.homeCoords.lat,
+                    lng: APP_CONFIG.homeCoords.lng,
+                    speed: 0,
+                    heading: 0,
+                    timestamp: new Date().toISOString()
+                };
+
+                lblSpeed.textContent = `0 km/h`;
+                updateDeviceTelemetry();
+                fetchWeatherConditions();
+                showNotification('รีเซ็ตอุปกรณ์กลับไปพิกัดบ้านเรียบร้อย', 'info');
+            });
         }
+
+        // =========================================================================
+        // 9. TOAST NOTIFICATIONS (ระบบแจ้งเตือนแบบ Pop-up สวยงาม)
+        // =========================================================================
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-blue-600 text-white";
+            let iconClass = "fa-solid fa-circle-info";
+
+            if (type === 'success') {
+                bgClass = "bg-emerald-600 text-white";
+                iconClass = "fa-solid fa-circle-check";
+            } else if (type === 'warning') {
+                bgClass = "bg-amber-500 text-slate-900";
+                iconClass = "fa-solid fa-triangle-exclamation";
+            } else if (type === 'error') {
+                bgClass = "bg-rose-600 text-white";
+                iconClass = "fa-solid fa-circle-exclamation";
+            }
+
+            toast.className = `flex items-center space-x-3 px-4 py-3 rounded-xl shadow-lg transform transition duration-300 ease-out translate-y-2 opacity-0 pointer-events-auto max-w-sm ${bgClass}`;
+            toast.innerHTML = `
+                <i class="${iconClass} text-lg"></i>
+                <span class="text-xs font-semibold leading-relaxed">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            // Animate In
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 50);
+
+            // Auto Remove After 3.5s
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3500);
+        }
+
     </script>
 </body>
 </html>
