@@ -14,10 +14,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <!-- Leaflet Fullscreen CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.fullscreen@3.0.2/Control.FullScreen.css" />
-  <!-- Google Fonts: Sarabun (ภาษาไทย) -->
+  <!-- Google Fonts: Inter & Noto Sans Thai (iOS Style Simulation) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- ===== Custom CSS ===== -->
   <style>
@@ -25,29 +25,29 @@
        ตัวแปรสี — โทนการท่องเที่ยว (น้ำเงินเข้ม / ฟ้า / ขาว)
     ------------------------------------------------------- */
     :root {
-      --primary:    #0d3b66;
-      --secondary:  #1a6fa8;
-      --accent:     #48cae4;
-      --light-bg:   #f0f7ff;
+      --primary:    #2d6a4f;   /* เขียวเข้มพาสเทล */
+      --secondary:  #52b788;   /* เขียวกลาง */
+      --accent:     #95d5b2;   /* เขียวอ่อนพาสเทล */
+      --light-bg:   #f7fdf9;   /* พื้นหลังเขียวจางๆ */
       --card-bg:    #ffffff;
-      --text-main:  #1e2a38;
-      --text-muted: #6c7a8d;
-      --success:    #2ec4b6;
-      --danger:     #e63946;
-      --warning:    #f4a261;
-      --border:     #d0e4f7;
+      --text-main:  #1b4332;   /* ตัวอักษรเขียวเข้มมาก */
+      --text-muted: #6c757d;
+      --success:    #40916c;
+      --danger:     #ff6b6b;
+      --warning:    #ffd166;
+      --border:     #d8f3dc;
     }
 
-    /* Dark Mode Variables */
+    /* Dark Mode Variables (Greenish Dark) */
     body.dark-mode {
-      --primary:    #1a1a1a;
-      --secondary:  #2c3e50;
-      --accent:     #3498db;
-      --light-bg:   #121212;
-      --card-bg:    #1e1e1e;
-      --text-main:  #e0e0e0;
-      --text-muted: #a0a0a0;
-      --border:     #333333;
+      --primary:    #1b4332;
+      --secondary:  #2d6a4f;
+      --accent:     #52b788;
+      --light-bg:   #0d1b15;
+      --card-bg:    #1a2e25;
+      --text-main:  #d8f3dc;
+      --text-muted: #95d5b2;
+      --border:     #2d6a4f;
     }
 
     body.dark-mode .app-card { box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
@@ -67,10 +67,12 @@
     html, body {
       height: 100%;
       margin: 0;
-      font-family: 'Sarabun', sans-serif;
+      /* iOS Style Font Stack */
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Sukhumvit Set", "Inter", "Noto Sans Thai", sans-serif;
       background: var(--light-bg);
       color: var(--text-main);
       font-size: 15px;
+      -webkit-font-smoothing: antialiased;
     }
 
     /* -------------------------------------------------------
@@ -314,8 +316,8 @@
       bottom: 0;
       left: 0;
       right: 0;
-      z-index: 1000;
-      background: rgba(13,59,102,0.92);
+      z-index: 1000; /* เดิม */
+      background: rgba(27,67,50,0.92);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       color: #fff;
@@ -324,8 +326,12 @@
       flex-wrap: wrap;
       gap: 8px 18px;
       align-items: center;
-      border-top: 1px solid rgba(72,202,228,0.3);
+      border-top: 1px solid rgba(149,213,178,0.3);
     }
+    /* ให้ Dashboard แสดงในโหมด Fullscreen */
+    :fullscreen .map-dashboard { z-index: 2147483647; }
+    :-webkit-full-screen .map-dashboard { z-index: 2147483647; }
+    :-ms-fullscreen .map-dashboard { z-index: 2147483647; }
     .map-dashboard .dash-item {
       display: flex;
       align-items: center;
@@ -365,6 +371,39 @@
     .map-control-btn:hover { background: rgba(255,255,255,0.25); }
     .map-control-btn.active { background: var(--accent); color: var(--primary); border-color: var(--accent); }
 
+    /* Route History List */
+    .route-history-panel {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      background: rgba(255,255,255,0.9);
+      border-radius: 8px;
+      padding: 8px;
+      max-width: 200px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: none;
+    }
+    body.dark-mode .route-history-panel { background: rgba(30,30,30,0.9); color: #fff; }
+    .route-list {
+      max-height: 200px;
+      overflow-y: auto;
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0 0;
+      font-size: 0.75rem;
+    }
+    .route-list li {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .route-list li:hover { background: var(--light-bg); }
+    .route-list li .btn-del { color: var(--danger); padding: 0 4px; }
+
     /* Leaflet custom icon */
     .car-marker-icon {
       background: transparent;
@@ -375,7 +414,7 @@
        แท็บ 3: สภาพอากาศ & น้ำมัน
     ------------------------------------------------------- */
     .weather-hero {
-      background: linear-gradient(135deg, var(--primary) 0%, #1565c0 60%, var(--accent) 100%);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 60%, var(--accent) 100%);
       border-radius: 16px;
       padding: 24px 20px;
       color: #fff;
@@ -429,6 +468,23 @@
     .weather-detail-item i { font-size: 1.2rem; color: var(--accent); }
     .weather-detail-item .wd-label { font-size: 0.72rem; opacity: 0.75; }
     .weather-detail-item .wd-value { font-size: 0.95rem; font-weight: 600; }
+
+    /* พยากรณ์อากาศล่วงหน้า */
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .forecast-item {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 12px 8px;
+      text-align: center;
+    }
+    .forecast-item .fc-date { font-size: 0.75rem; opacity: 0.8; margin-bottom: 5px; }
+    .forecast-item .fc-icon { font-size: 1.5rem; margin-bottom: 5px; }
+    .forecast-item .fc-temp { font-size: 0.9rem; font-weight: 600; }
 
     /* ราคาน้ำมัน */
     .fuel-grid {
@@ -586,25 +642,6 @@
         </div>
       </div>
 
-      <!-- ฟอร์มตั้งงบประมาณ -->
-      <div class="app-card">
-        <div class="card-header-custom">
-          <i class="bi bi-piggy-bank"></i>
-          <h5>ตั้งงบประมาณทริป</h5>
-        </div>
-        <div class="row g-2 align-items-end">
-          <div class="col-8 col-sm-9">
-            <label class="form-label">งบประมาณทั้งหมด (บาท)</label>
-            <input type="number" id="budgetInput" class="form-control" placeholder="เช่น 5000" min="0" />
-          </div>
-          <div class="col-4 col-sm-3">
-            <button class="btn-primary-custom w-100" onclick="setBudget()">
-              <i class="bi bi-check2"></i> ตั้งค่า
-            </button>
-          </div>
-        </div>
-      </div>
-
       <!-- ฟอร์มเพิ่มรายจ่าย -->
       <div class="app-card">
         <div class="card-header-custom">
@@ -696,6 +733,25 @@
         </div>
       </div>
 
+      <!-- ฟอร์มตั้งงบประมาณ (ย้ายมาด้านล่าง) -->
+      <div class="app-card">
+        <div class="card-header-custom">
+          <i class="bi bi-piggy-bank"></i>
+          <h5>ตั้งงบประมาณทริป</h5>
+        </div>
+        <div class="row g-2 align-items-end">
+          <div class="col-8 col-sm-9">
+            <label class="form-label">งบประมาณทั้งหมด (บาท)</label>
+            <input type="number" id="budgetInput" class="form-control" placeholder="เช่น 5000" min="0" />
+          </div>
+          <div class="col-4 col-sm-3">
+            <button class="btn-primary-custom w-100" onclick="setBudget()">
+              <i class="bi bi-check2"></i> ตั้งค่า
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /container -->
   </div><!-- /tab-account -->
 
@@ -746,6 +802,12 @@
         </div>
         <!-- ปุ่มควบคุม -->
         <div class="ms-auto d-flex gap-2 flex-wrap">
+          <button class="map-control-btn" onclick="toggleRouteHistory()">
+            <i class="bi bi-clock-history"></i> ประวัติเส้นทาง
+          </button>
+          <button class="map-control-btn" onclick="saveCurrentRoute()">
+            <i class="bi bi-save"></i> บันทึกเส้นทาง
+          </button>
           <button class="map-control-btn" id="btnLockCenter" onclick="toggleLockCenter()">
             <i class="bi bi-lock-fill" id="lockIcon"></i>
             <span id="lockLabel">ล็อกตาม GPS</span>
@@ -755,6 +817,16 @@
           </button>
         </div>
       </div>
+
+      <!-- Route History Panel -->
+      <div class="route-history-panel" id="routeHistoryPanel">
+        <div class="d-flex justify-content-between align-items-center">
+          <strong style="font-size:0.8rem;">เส้นทางที่บันทึก</strong>
+          <i class="bi bi-x-lg" style="cursor:pointer;" onclick="toggleRouteHistory()"></i>
+        </div>
+        <ul class="route-list" id="routeList"></ul>
+      </div>
+
     </div>
   </div><!-- /tab-map -->
 
@@ -805,6 +877,12 @@
         </div>
         <div style="margin-top:12px; font-size:0.72rem; opacity:0.6;">
           อัปเดตล่าสุด: <span id="weatherUpdated">—</span>
+        </div>
+
+        <!-- Forecast 3 Days -->
+        <div class="section-title mt-4 text-white opacity-75" style="font-size:0.7rem;">พยากรณ์อากาศ 3 วันล่วงหน้า</div>
+        <div class="forecast-grid" id="weatherForecast">
+          <!-- จะถูกสร้างโดย JS -->
         </div>
       </div>
 
@@ -1134,18 +1212,18 @@ function renderBarChart() {
       plugins: {
         legend: {
           position: 'top',
-          labels: { font: { family: 'Sarabun', size: 11 }, padding: 10, boxWidth: 12 }
-        },
-        tooltip: {
-          callbacks: { label: ctx => ` ฿${formatMoney(ctx.parsed.y)}` }
-        }
-      },
-      scales: {
-        x: { ticks: { font: { family: 'Sarabun', size: 11 } } },
-        y: {
-          beginAtZero: true,
-          ticks: {
-            font: { family: 'Sarabun', size: 11 },
+	    labels: { font: { family: 'Inter', size: 11 }, padding: 10, boxWidth: 12 }
+	        },
+	        tooltip: {
+	          callbacks: { label: ctx => ` ฿${formatMoney(ctx.parsed.y)}` }
+	        }
+	      },
+	      scales: {
+	        x: { ticks: { font: { family: 'Inter', size: 11 } } },
+	        y: {
+	          beginAtZero: true,
+	          ticks: {
+	            font: { family: 'Inter', size: 11 },
             callback: v => '฿' + formatMoney(v)
           }
         }
@@ -1168,6 +1246,7 @@ let routePolyline  = null;   // เส้นทาง
 let routePoints    = loadData('trip_route', []); // จุดเส้นทางที่บันทึกไว้
 let lockCenter     = false;  // ล็อกแผนที่ตามรถ
 let watchId        = null;   // GPS watchPosition ID
+let routeHistory   = loadData('trip_route_history', []); // ประวัติเส้นทางที่บันทึกไว้
 let homeMarker     = null;   // marker บ้าน
 let destMarker     = null;   // marker ปลายทาง
 let destCoords     = loadData('trip_dest', null); // พิกัดปลายทางที่บันทึกไว้
@@ -1227,10 +1306,10 @@ function initMap() {
   // Marker บ้าน
   const homeIcon = L.divIcon({
     html: `<div style="
-      background:#0d3b66;color:#fff;border-radius:50%;
-      width:32px;height:32px;display:flex;align-items:center;
-      justify-content:center;font-size:16px;
-      border:2px solid #48cae4;box-shadow:0 2px 8px rgba(0,0,0,0.4);">
+	      background:#2d6a4f;color:#fff;border-radius:50%;
+	      width:32px;height:32px;display:flex;align-items:center;
+	      justify-content:center;font-size:16px;
+	      border:2px solid #95d5b2;box-shadow:0 2px 8px rgba(0,0,0,0.4);">
       🏠</div>`,
     className: '',
     iconSize: [32, 32],
@@ -1243,7 +1322,7 @@ function initMap() {
   // วาดเส้นทางที่บันทึกไว้ (ถ้ามี)
   if (routePoints.length > 1) {
     routePolyline = L.polyline(routePoints, {
-      color: '#48cae4', weight: 4, opacity: 0.8, smoothFactor: 1
+      color: '#52b788', weight: 4, opacity: 0.8, smoothFactor: 1
     }).addTo(tripMap);
   }
 
@@ -1259,6 +1338,80 @@ function initMap() {
 
   // เริ่ม GPS Tracking
   startGPSTracking();
+  renderRouteList();
+}
+
+/** บันทึกเส้นทางปัจจุบัน */
+function saveCurrentRoute() {
+  if (routePoints.length < 2) {
+    showToast('ไม่มีเส้นทางให้บันทึก', 'warning');
+    return;
+  }
+  const name = prompt('ตั้งชื่อเส้นทางนี้:', `เส้นทางวันที่ ${new Date().toLocaleDateString('th-TH')}`);
+  if (!name) return;
+
+  const newRoute = {
+    id: Date.now(),
+    name: name,
+    points: [...routePoints],
+    date: new Date().toLocaleString('th-TH')
+  };
+
+  routeHistory.push(newRoute);
+  saveData('trip_route_history', routeHistory);
+  renderRouteList();
+  showToast('บันทึกเส้นทางเรียบร้อย', 'success');
+}
+
+/** แสดงรายการเส้นทาง */
+function renderRouteList() {
+  const list = document.getElementById('routeList');
+  list.innerHTML = '';
+  if (routeHistory.length === 0) {
+    list.innerHTML = '<li style="color:var(--text-muted); text-align:center;">ยังไม่มีข้อมูล</li>';
+    return;
+  }
+  routeHistory.slice().reverse().forEach(route => {
+    const li = document.createElement('li');
+    li.innerHTML = `
+      <span onclick="loadSavedRoute(${route.id})">${route.name}</span>
+      <i class="bi bi-trash btn-del" onclick="deleteSavedRoute(${route.id})"></i>
+    `;
+    list.appendChild(li);
+  });
+}
+
+/** โหลดเส้นทางที่บันทึกมาแสดง */
+function loadSavedRoute(id) {
+  const route = routeHistory.find(r => r.id === id);
+  if (!route) return;
+
+  // ล้างเส้นทางปัจจุบันชั่วคราวบนแผนที่
+  if (routePolyline) tripMap.removeLayer(routePolyline);
+
+  // วาดเส้นทางที่โหลดมา
+  routePolyline = L.polyline(route.points, {
+    color: '#ff9f43', weight: 5, opacity: 0.9, dashArray: '10, 10'
+  }).addTo(tripMap);
+
+  tripMap.fitBounds(routePolyline.getBounds());
+  showToast(`โหลดเส้นทาง: ${route.name}`, 'info');
+  toggleRouteHistory();
+}
+
+/** ลบเส้นทางที่บันทึก */
+function deleteSavedRoute(id) {
+  if (!confirm('ยืนยันการลบเส้นทางนี้?')) return;
+  routeHistory = routeHistory.filter(r => r.id !== id);
+  saveData('trip_route_history', routeHistory);
+  renderRouteList();
+  showToast('ลบเส้นทางแล้ว', 'info');
+}
+
+/** เปิด/ปิด Panel ประวัติเส้นทาง */
+function toggleRouteHistory() {
+  const panel = document.getElementById('routeHistoryPanel');
+  panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
 }
 
 /** ตั้งค่าปลายทาง */
@@ -1528,8 +1681,9 @@ const WMO_CODES = {
 async function fetchWeather(lat, lng) {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
-      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,` +
-      `weather_code,wind_speed_10m,visibility&wind_speed_unit=kmh&timezone=Asia%2FBangkok`;
+      `&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,visibility` +
+      `&daily=weather_code,temperature_2m_max,temperature_2m_min` +
+      `&wind_speed_unit=kmh&timezone=Asia%2FBangkok&forecast_days=4`;
     const res  = await fetch(url);
     const data = await res.json();
     const cur  = data.current;
@@ -1545,6 +1699,26 @@ async function fetchWeather(lat, lng) {
     document.getElementById('wdFeelsLike').textContent     = `${Math.round(cur.apparent_temperature)}°C`;
     document.getElementById('weatherUpdated').textContent  =
       new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+
+    // อัปเดตพยากรณ์ล่วงหน้า
+    const forecastDiv = document.getElementById('weatherForecast');
+    forecastDiv.innerHTML = '';
+    // เริ่มที่ index 1 เพราะ 0 คือวันนี้
+    for (let i = 1; i <= 3; i++) {
+      const date = new Date(data.daily.time[i]);
+      const dayName = date.toLocaleDateString('th-TH', { weekday: 'short' });
+      const wmoIcon = WMO_CODES[data.daily.weather_code[i]]?.emoji || '🌡️';
+      const maxT = Math.round(data.daily.temperature_2m_max[i]);
+      const minT = Math.round(data.daily.temperature_2m_min[i]);
+      
+      forecastDiv.innerHTML += `
+        <div class="forecast-item">
+          <div class="fc-date">${dayName} ${date.getDate()}</div>
+          <div class="fc-icon">${wmoIcon}</div>
+          <div class="fc-temp">${maxT}° / ${minT}°</div>
+        </div>
+      `;
+    }
 
     // อัปเดตชื่อพื้นที่
     reverseGeocodeWeather(lat, lng);
