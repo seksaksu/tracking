@@ -353,14 +353,30 @@
     /* Floating Map Dashboard - Improved UI */
     .map-dashboard {
       position: absolute;
-      top: 15px;
-      left: 15px;
-      right: 15px;
+      top: 10px;
+      left: 10px;
+      right: 10px;
       z-index: 1000;
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      pointer-events: none; /* ให้คลิกทะลุไปที่แผนที่ได้ถ้าไม่ใช่ตัวปุ่ม */
+      gap: 8px;
+      pointer-events: none;
+      justify-content: flex-start;
+    }
+    @media (max-width: 576px) {
+      .map-dashboard {
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        gap: 6px;
+      }
+      .map-stat-card {
+        padding: 8px 12px;
+        min-width: 120px;
+        flex: 1 1 calc(50% - 6px); /* ให้เรียง 2 คอลัมน์บนมือถือ */
+      }
+      .map-stat-card i { font-size: 1.1rem; }
+      .map-stat-value { font-size: 0.85rem; }
     }
     /* ให้ Dashboard แสดงในโหมด Fullscreen */
     :fullscreen .map-dashboard { z-index: 2147483647; }
@@ -380,7 +396,12 @@
       border: 1px solid rgba(255,255,255,0.3);
       pointer-events: auto;
       min-width: 140px;
+      cursor: grab;
+      user-select: none;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
+    .map-stat-card:active { cursor: grabbing; transform: scale(0.98); }
+    .map-stat-card.dragging { opacity: 0.5; transform: scale(1.05); box-shadow: 0 15px 30px rgba(0,0,0,0.2); }
     body.dark-mode .map-stat-card {
       background: rgba(26, 46, 37, 0.9);
       color: #fff;
@@ -862,30 +883,30 @@
       <!-- แผนที่ Leaflet -->
       <div id="map"></div>
 
-      <!-- Floating Stat Cards -->
-      <div class="map-dashboard">
-        <div class="map-stat-card">
+      <!-- Floating Stat Cards (Draggable) -->
+      <div class="map-dashboard" id="mapDashboard">
+        <div class="map-stat-card" draggable="true" id="stat-home">
           <i class="bi bi-house-door"></i>
           <div class="map-stat-info">
             <span class="map-stat-label">จากบ้าน</span>
             <span class="map-stat-value" id="dashDistance">— กม.</span>
           </div>
         </div>
-        <div class="map-stat-card" id="destDash" style="display:none;">
+        <div class="map-stat-card" draggable="true" id="destDash" style="display:none;">
           <i class="bi bi-flag-fill" style="color:var(--danger);"></i>
           <div class="map-stat-info">
             <span class="map-stat-label">ถึงเป้าหมาย</span>
             <span class="map-stat-value" id="dashDestDist">— กม.</span>
           </div>
         </div>
-        <div class="map-stat-card">
+        <div class="map-stat-card" draggable="true" id="stat-alt">
           <i class="bi bi-arrow-up-circle" style="color:var(--purple);"></i>
           <div class="map-stat-info">
             <span class="map-stat-label">ความสูง</span>
             <span class="map-stat-value" id="dashAlt">— ม.</span>
           </div>
         </div>
-        <div class="map-stat-card d-none d-md-flex">
+        <div class="map-stat-card" draggable="true" id="stat-area">
           <i class="bi bi-geo-alt"></i>
           <div class="map-stat-info">
             <span class="map-stat-label">ตำแหน่ง</span>
@@ -2027,6 +2048,81 @@ function formatMoney(num) {
 /* =====================================================
    ส่วนที่ 9: Initialization — เรียกเมื่อหน้าโหลดเสร็จ
 ===================================================== */
+  // ระบบ Drag & Drop สำหรับ Stat Cards
+  function initDraggableStats() {
+    const container = document.getElementById('mapDashboard');
+    const cards = container.querySelectorAll('.map-stat-card');
+
+    cards.forEach(card => {
+      card.addEventListener('dragstart', () => card.classList.add('dragging'));
+      card.addEventListener('dragend', () => card.classList.remove('dragging'));
+      
+      // รองรับ Touch สำหรับมือถือ
+      card.addEventListener('touchstart', (e) => {
+        card.classList.add('dragging');
+      }, {passive: true});
+
+      card.addEventListener('touchend', (e) => {
+        card.classList.remove('dragging');
+        const touch = e.changedTouches[0];
+        const afterElement = getDragAfterElement(container, touch.clientX, touch.clientY);
+        if (afterElement == null) {
+          container.appendChild(card);
+        } else {
+          container.insertBefore(card, afterElement);
+        }
+        saveStatsOrder();
+      });
+    });
+
+    container.addEventListener('dragover', e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(container, e.clientX, e.clientY);
+      const draggable = document.querySelector('.dragging');
+      if (draggable) {
+        if (afterElement == null) {
+          container.appendChild(draggable);
+        } else {
+          container.insertBefore(draggable, afterElement);
+        }
+      }
+    });
+
+    container.addEventListener('dragend', () => {
+      const dragging = document.querySelector('.dragging');
+      if (dragging) dragging.classList.remove('dragging');
+      saveStatsOrder();
+    });
+  }
+
+  function getDragAfterElement(container, x, y) {
+    const draggableElements = [...container.querySelectorAll('.map-stat-card:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = x - box.left - box.width / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function saveStatsOrder() {
+    const order = [...document.querySelectorAll('.map-stat-card')].map(c => c.id);
+    localStorage.setItem('statsOrder', JSON.stringify(order));
+  }
+
+  function loadStatsOrder() {
+    const order = JSON.parse(localStorage.getItem('statsOrder'));
+    if (!order) return;
+    const container = document.getElementById('mapDashboard');
+    order.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) container.appendChild(el);
+    });
+  }
+
 document.addEventListener('DOMContentLoaded', () => {
   // โหลด Dark Mode
   if (loadData('dark_mode', false)) {
@@ -2042,7 +2138,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // เริ่มต้นแผนที่เมื่อแท็บแผนที่ถูกคลิกครั้งแรก
   document.querySelector('[data-tab="tab-map"]').addEventListener('click', () => {
-    setTimeout(initMap, 100);
+    setTimeout(() => {
+      initMap();
+      initDraggableStats();
+      loadStatsOrder();
+    }, 100);
   });
 
   // โหลดราคาน้ำมันทันที (แท็บ 3)
