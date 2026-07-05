@@ -927,6 +927,9 @@
         <button class="map-control-btn" onclick="downloadKML()" data-label="ส่งออก KML">
           <i class="bi bi-download"></i>
         </button>
+        <button class="map-control-btn" onclick="clearKMLRoutes()" id="btnClearKML" data-label="ล้างเส้นทาง KML" style="display:none;">
+          <i class="bi bi-eraser-fill" style="color:var(--danger);"></i>
+        </button>
       </div>
 
       <!-- Route History Panel -->
@@ -1373,6 +1376,7 @@ const HOME_LNG = 102.294181;
 let tripMap        = null;   // instance ของ Leaflet map
 let carMarker      = null;   // marker รูปรถ
 let routePolyline  = null;   // เส้นทาง
+let kmlLayers      = [];     // เก็บเลเยอร์ KML ที่นำเข้า
 let routePoints    = loadData('trip_route', []); // จุดเส้นทางที่บันทึกไว้
 let lockCenter     = false;  // ล็อกแผนที่ตามรถ
 let watchId        = null;   // GPS watchPosition ID
@@ -1523,6 +1527,9 @@ function importKML(event) {
         const importedPoly = L.polyline(importedPoints, {
           color: '#ff6b6b', weight: 4, opacity: 0.8, dashArray: '5, 10'
         }).addTo(tripMap);
+        
+        kmlLayers.push(importedPoly);
+        document.getElementById('btnClearKML').style.display = 'flex';
         
         tripMap.fitBounds(importedPoly.getBounds());
         showToast('นำเข้าเส้นทาง KML เรียบร้อย', 'success');
@@ -1767,6 +1774,15 @@ function simulateGPS() {
     onGPSSuccess({ coords: { latitude: lat, longitude: lng } });
   }, 3000);
   window._simInterval = interval;
+}
+
+/** ล้างเส้นทาง KML ที่นำเข้า */
+function clearKMLRoutes() {
+  if (kmlLayers.length === 0) return;
+  kmlLayers.forEach(layer => tripMap.removeLayer(layer));
+  kmlLayers = [];
+  document.getElementById('btnClearKML').style.display = 'none';
+  showToast('ล้างเส้นทาง KML เรียบร้อย', 'info');
 }
 
 /** คำนวณระยะทาง Haversine (กิโลเมตร) */
