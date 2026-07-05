@@ -892,20 +892,14 @@
             <span class="map-stat-value" id="dashDistance">— กม.</span>
           </div>
         </div>
-        <div class="map-stat-card" draggable="true" id="destDash" style="display:none;">
+        <div class="map-stat-card" draggable="true" id="destDash" style="display: none !important;">
           <i class="bi bi-flag-fill" style="color:var(--danger);"></i>
           <div class="map-stat-info">
             <span class="map-stat-label">ถึงเป้าหมาย</span>
             <span class="map-stat-value" id="dashDestDist">— กม.</span>
           </div>
         </div>
-        <div class="map-stat-card" draggable="true" id="stat-alt">
-          <i class="bi bi-arrow-up-circle" style="color:var(--purple);"></i>
-          <div class="map-stat-info">
-            <span class="map-stat-label">ความสูง</span>
-            <span class="map-stat-value" id="dashAlt">— ม.</span>
-          </div>
-        </div>
+
         <div class="map-stat-card" draggable="true" id="stat-area">
           <i class="bi bi-geo-alt"></i>
           <div class="map-stat-info">
@@ -1654,9 +1648,13 @@ function setDestination(lat, lng, shouldSave = true) {
 
 /** อัปเดตระยะทางไปปลายทาง */
 function updateDestDistance() {
+  const destEl = document.getElementById('destDash');
+  if (!destEl) return;
+
   if (window.currentLat && destCoords) {
     const dist = haversine(window.currentLat, window.currentLng, destCoords.lat, destCoords.lng);
-    document.getElementById('destDash').style.display = 'flex';
+    // ใช้ setProperty เพื่อ override !important
+    destEl.style.setProperty('display', 'flex', 'important');
     document.getElementById('dashDestDist').textContent = `${dist.toFixed(2)} กม.`;
     
     // ถ้าใกล้มาก (เช่น < 100 เมตร)
@@ -1664,7 +1662,7 @@ function updateDestDistance() {
       document.getElementById('dashDestDist').innerHTML = '<span class="badge bg-success">ถึงแล้ว!</span>';
     }
   } else {
-    document.getElementById('destDash').style.display = 'none';
+    destEl.style.setProperty('display', 'none', 'important');
   }
 }
 
@@ -1690,13 +1688,13 @@ function getCarIcon() {
 /** เริ่มติดตาม GPS */
 function startGPSTracking() {
   if (!navigator.geolocation) {
-    document.getElementById('dashCoords').textContent = 'ไม่รองรับ GPS';
+    showToast('ไม่รองรับ GPS', 'warning');
     return;
   }
   watchId = navigator.geolocation.watchPosition(
     onGPSSuccess,
     onGPSError,
-    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 20000 }
   );
 }
 
@@ -1736,10 +1734,8 @@ function onGPSSuccess(pos) {
 
   // อัปเดต Dashboard
   const dist = haversine(HOME_LAT, HOME_LNG, lat, lng);
-  const alt  = pos.coords.altitude !== null ? Math.round(pos.coords.altitude) : '—';
-  document.getElementById('dashCoords').textContent   = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  document.getElementById('dashDistance').textContent = `${dist.toFixed(2)} กม.`;
-  document.getElementById('dashAlt').textContent      = alt !== '—' ? `${alt} ม.` : '—';
+  const distEl = document.getElementById('dashDistance');
+  if (distEl) distEl.textContent = `${dist.toFixed(2)} กม.`;
 
   // อัปเดตระยะปลายทาง
   updateDestDistance();
@@ -1751,9 +1747,13 @@ function onGPSSuccess(pos) {
 /** เมื่อ GPS ผิดพลาด */
 function onGPSError(err) {
   console.warn('GPS Error:', err.message);
-  document.getElementById('dashCoords').textContent = 'ไม่สามารถระบุตำแหน่งได้';
-  // ใช้พิกัดจำลองสำหรับ demo
-  simulateGPS();
+  if (err.code === 1) showToast('กรุณาอนุญาต GPS เพื่อให้แผนที่ทำงาน', 'warning');
+  // ใช้พิกัดจำลองสำหรับ demo เฉพาะเมื่ออยู่บน Desktop (ไม่มี GPS จริง)
+  if (!/Android|iPhone|iPad/i.test(navigator.userAgent)) {
+    simulateGPS();
+  } else {
+    updateDashboardWithFallback();
+  }
 }
 
 /** จำลอง GPS (สำหรับ demo บน desktop) */
@@ -1787,8 +1787,8 @@ async function reverseGeocode(lat, lng) {
     const data = await res.json();
     const addr = data.address || {};
     // ดึงชื่ออำเภอ + จังหวัด
-    const district = addr.county || addr.city_district || addr.suburb || '';
-    const province = addr.state || '';
+    const district = addr.city_district || addr.district || addr.county || addr.suburb || '';
+    const province = addr.state || addr.province || '';
     const areaText = [district, province].filter(Boolean).join(', ') || 'ไม่ทราบพื้นที่';
     document.getElementById('dashArea').textContent = areaText;
   } catch {
@@ -2123,6 +2123,52 @@ function formatMoney(num) {
     });
   }
 
+  // ระบบขอสิทธิ์ GPS สำหรับมือถือ
+  async function requestGPSPermission() {
+    if (!navigator.geolocation) {
+      showToast('เบราว์เซอร์ของคุณไม่รองรับ GPS', 'warning');
+      return;
+    }
+    
+    showToast('กำลังขอสิทธิ์เข้าถึงพิกัด GPS...', 'info');
+    
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        window.currentLat = pos.coords.latitude;
+        window.currentLng = pos.coords.longitude;
+        showToast('เชื่อมต่อ GPS สำเร็จ', 'success');
+        if (window.tripMap) {
+          onGPSSuccess(pos);
+          tripMap.setView([window.currentLat, window.currentLng], 15);
+        }
+      },
+      err => {
+        console.error('GPS Error:', err);
+        let msg = 'ไม่สามารถเข้าถึงพิกัดได้';
+        if (err.code === 1) msg = 'กรุณาอนุญาตให้เข้าถึงพิกัด (Location Permission)';
+        else if (err.code === 2) msg = 'ไม่พบสัญญาณ GPS';
+        else if (err.code === 3) msg = 'การค้นหาพิกัดใช้เวลานานเกินไป';
+        showToast(msg, 'warning');
+        
+        // Fallback: แสดงข้อมูลจากพิกัดบ้าน
+        updateDashboardWithFallback();
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  function updateDashboardWithFallback() {
+    const lat = window.currentLat || HOME_LAT;
+    const lng = window.currentLng || HOME_LNG;
+    
+    const dist = haversine(HOME_LAT, HOME_LNG, lat, lng);
+    const distEl = document.getElementById('dashDistance');
+    if (distEl) distEl.textContent = `${dist.toFixed(2)} กม.`;
+    
+    reverseGeocode(lat, lng);
+    updateDestDistance();
+  }
+
 document.addEventListener('DOMContentLoaded', () => {
   // โหลด Dark Mode
   if (loadData('dark_mode', false)) {
@@ -2142,6 +2188,8 @@ document.addEventListener('DOMContentLoaded', () => {
       initMap();
       initDraggableStats();
       loadStatsOrder();
+      // ขอสิทธิ์ GPS ทันทีเมื่อเปิดหน้าแผนที่
+      requestGPSPermission();
     }, 100);
   });
 
@@ -2158,8 +2206,9 @@ document.addEventListener('DOMContentLoaded', () => {
         window.currentLat = pos.coords.latitude;
         window.currentLng = pos.coords.longitude;
         fetchWeather(window.currentLat, window.currentLng);
+        updateDashboardWithFallback();
       },
-      () => { /* ใช้พิกัดบ้านเป็น fallback */ }
+      () => { updateDashboardWithFallback(); }
     );
   }
 });
